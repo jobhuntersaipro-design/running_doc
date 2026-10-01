@@ -23,22 +23,37 @@ interface R2Config {
   client: AwsClient;
   /** S3 endpoint for the bucket, no trailing slash. */
   bucketUrl: string;
+  bucket: string;
   /** Public base URL for reading files (r2.dev or a custom domain), no trailing slash. */
   publicUrl: string;
 }
 
+/** A storage failure with a message that says what to fix. Safe to show to the signed-in admin. */
+export class StorageError extends Error {}
+
 let r2Cache: R2Config | null | undefined;
 function r2(): R2Config | null {
   if (r2Cache !== undefined) return r2Cache;
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_URL, R2_ENDPOINT } = process.env;
+  // Values pasted into a dashboard often carry spaces or a trailing newline.
+  const env = (name: string) => (process.env[name] ?? "").trim();
+  let accountId = env("R2_ACCOUNT_ID");
+  // Accept the whole S3 API URL too: https://<account id>.r2.cloudflarestorage.com/<bucket>
+  const fromUrl = /([0-9a-f]{32})\.(?:[a-z]+\.)?r2\.cloudflarestorage\.com/i.exec(accountId);
+  if (fromUrl) accountId = fromUrl[1];
+  const accessKeyId = env("R2_ACCESS_KEY_ID");
+  const secretAccessKey = env("R2_SECRET_ACCESS_KEY");
+  const bucket = env("R2_BUCKET");
+  let publicUrl = env("R2_PUBLIC_URL").replace(/\/+$/, "");
+  if (publicUrl && !/^https?:\/\//.test(publicUrl)) publicUrl = `https://${publicUrl}`;
   // R2_ENDPOINT is optional: for buckets in a jurisdiction, e.g. https://<account>.eu.r2.cloudflarestorage.com
-  const endpoint = (R2_ENDPOINT || `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`).replace(/\/+$/, "");
+  const endpoint = (env("R2_ENDPOINT") || `https://${accountId}.r2.cloudflarestorage.com`).replace(/\/+$/, "");
   r2Cache =
-    R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET && R2_PUBLIC_URL
+    accountId && accessKeyId && secretAccessKey && bucket && publicUrl
       ? {
-          client: new AwsClient({ accessKeyId: R2_ACCESS_KEY_ID, secretAccessKey: R2_SECRET_ACCESS_KEY, service: "s3", region: "auto" }),
-          bucketUrl: `${endpoint}/${R2_BUCKET}`,
-          publicUrl: R2_PUBLIC_URL.replace(/\/+$/, ""),
+          client: new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region: "auto" }),
+          bucketUrl: `${endpoint}/${bucket}`,
+          bucket,
+          publicUrl,
         }
       : null;
   return r2Cache;
@@ -67,10 +82,38 @@ function keyOf(url: string): string | null {
   return null;
 }
 
-async function r2Fetch(cfg: R2Config, pathAndQuery: string, init: RequestInit = {}): Promise<Response> {
-  const res = await cfg.client.fetch(`${cfg.bucketUrl}${pathAndQuery}`, { ...init, cache: "no-store" });
-  if (!res.ok && res.status !== 404) throw new Error(`R2 ${init.method ?? "GET"} ${pathAndQuery} failed: ${res.status} ${await res.text()}`);
-  return res;
+/** Calls the R2 S3 API. A missing object (404 NoSuchKey) is returned, not thrown, when allowMissing is set. */
+async function r2Fetch(cfg: R2Config, pathAndQuery: string, init: RequestInit = {}, allowMissing = false): Promise<Response> {
+  let res: Response;
+  try {
+    res = await cfg.client.fetch(`${cfg.bucketUrl}${pathAndQuery}`, { ...init, cache: "no-store" });
+  } catch (e) {
+    throw new StorageError(
+      `Could not reach R2 at ${new URL(cfg.bucketUrl).host}. Check R2_ACCOUNT_ID (the 32 character account ID). (${(e as Error).message})`,
+    );
+  }
+  if (res.ok) return res;
+  const xml = await res.text();
+  const code = /<Code>([^<]*)<\/Code>/.exec(xml)?.[1] ?? "";
+  const message = /<Message>([^<]*)<\/Message>/.exec(xml)?.[1] ?? "";
+  if (res.status === 404 && allowMissing && code !== "NoSuchBucket") return res;
+  if (code === "NoSuchBucket") throw new StorageError(`R2 has no bucket named "${cfg.bucket}" in this account. Check R2_BUCKET.`);
+  if (code === "InvalidAccessKeyId" || code === "SignatureDoesNotMatch" || res.status === 401)
+    throw new StorageError(`R2 rejected the keys (${code || res.status}). Check R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY.`);
+  if (code === "AccessDenied" || res.status === 403)
+    throw new StorageError(`The R2 token is not allowed to use bucket "${cfg.bucket}" (${code || res.status}). Give the token Object Read & Write on that bucket.`);
+  throw new StorageError(`R2 ${init.method ?? "GET"} failed: ${res.status} ${code} ${message}`.trim());
+}
+
+/** Tries a list call so the admin can see whether storage works, and why not. */
+export async function checkStorage(): Promise<{ ok: true; mode: "r2" | "local" } | { ok: false; error: string }> {
+  if (!storageReady()) return { ok: false, error: new StorageNotReadyError().message };
+  try {
+    await listFiles("races/");
+    return { ok: true, mode: r2() ? "r2" : "local" };
+  } catch (e) {
+    return { ok: false, error: e instanceof StorageError ? e.message : "File storage failed. Check the R2 settings." };
+  }
 }
 
 /**
@@ -161,8 +204,8 @@ export async function readText(url: string): Promise<string> {
   if (key === null) throw new Error("Not a stored file");
   const cfg = r2();
   if (cfg && !url.startsWith(LOCAL_PREFIX)) {
-    const res = await r2Fetch(cfg, `/${encodeKey(key)}`);
-    if (!res.ok) throw new Error(`Missing file ${key}`);
+    const res = await r2Fetch(cfg, `/${encodeKey(key)}`, {}, true);
+    if (!res.ok) throw new StorageError(`A stored file is missing: ${key}`);
     return res.text();
   }
   const file = localPath(key);
@@ -181,7 +224,7 @@ export async function deleteFiles(urls: string[]): Promise<void> {
         const file = localPath(key);
         if (file) await rm(file, { force: true });
       } else if (cfg) {
-        await r2Fetch(cfg, `/${encodeKey(key)}`, { method: "DELETE" });
+        await r2Fetch(cfg, `/${encodeKey(key)}`, { method: "DELETE" }, true);
       }
     }),
   );

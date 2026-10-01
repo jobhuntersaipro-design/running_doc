@@ -8,7 +8,7 @@ import { DeleteRace } from "@/components/admin/delete-race";
 import { LoginForm } from "@/components/admin/login-form";
 import { adminConfigured, isAdmin } from "@/lib/server/auth";
 import { overviewRaces } from "@/lib/server/races";
-import { storageReady } from "@/lib/server/store";
+import { checkStorage } from "@/lib/server/store";
 import styles from "@/components/admin/admin.module.css";
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
@@ -33,7 +33,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   }
 
   const { saved } = await props.searchParams;
-  const races = await overviewRaces();
+  const [races, storage] = await Promise.all([overviewRaces(), checkStorage()]);
   return (
     <AdminShell signedIn>
       <section className={styles.head}>
@@ -53,10 +53,11 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         </Alert>
       ) : null}
 
-      {!storageReady() ? (
-        <p className={styles.notice} role="status">
-          File storage is not set up, so new races cannot be saved. Add the R2 settings to the environment variables, then redeploy.
-        </p>
+      {!storage.ok ? (
+        <Alert tone="danger" title="File storage is not working">
+          {storage.error} New races and covers cannot be saved until this is fixed. After changing environment variables in
+          Vercel, redeploy.
+        </Alert>
       ) : null}
 
       <ul className={styles.raceList} aria-label="Races">

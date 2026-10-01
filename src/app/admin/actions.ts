@@ -13,7 +13,7 @@ import {
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
-import { deleteFiles, readText, saveFile, StorageNotReadyError } from "@/lib/server/store";
+import { deleteFiles, readText, saveFile, StorageError, StorageNotReadyError } from "@/lib/server/store";
 import { DISTANCES, LIMITS, STATION_KINDS, formatMb, type DistanceValue, type FormState } from "./shared";
 
 const text = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
@@ -28,7 +28,7 @@ async function requireAdmin() {
 }
 
 function storageError(e: unknown): FormState {
-  if (e instanceof StorageNotReadyError) return { error: e.message };
+  if (e instanceof StorageNotReadyError || e instanceof StorageError) return { error: e.message };
   console.error(e);
   return { error: "The race could not be saved. Try again in a moment." };
 }
@@ -111,7 +111,12 @@ function parseStations(raw: string, km: number): Station[] | null {
 export async function saveRace(_prev: FormState, fd: FormData): Promise<FormState> {
   await requireAdmin();
   const editId = text(fd, "id");
-  const existing = editId ? await getStoredRace(editId) : null;
+  let existing: StoredRace | null = null;
+  try {
+    existing = editId ? await getStoredRace(editId) : null;
+  } catch (e) {
+    return storageError(e);
+  }
   if (editId && !existing) return { error: "This race no longer exists." };
 
   const fieldErrors: Record<string, string> = {};
