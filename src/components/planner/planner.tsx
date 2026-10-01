@@ -200,6 +200,21 @@ export function Planner({ example }: { example: CourseInput }) {
 
           <FinishBenchmarks km={summary.totalKm} goalSeconds={summary.goalSeconds} />
 
+          <dl className={styles.kpiStrip} aria-label="Plan at a glance">
+            <div>
+              <dt>Total uphill</dt>
+              <dd className={styles.num}>{Math.round(summary.totalGain)} m</dd>
+            </div>
+            <div>
+              <dt>Gels</dt>
+              <dd className={styles.num}>{gels.length}</dd>
+            </div>
+            <div>
+              <dt>Drink stops</dt>
+              <dd className={styles.num}>{drinks.length}</dd>
+            </div>
+          </dl>
+
           <section className={styles.kpis} aria-label="Plan at a glance">
             <MetricCard
               label="Total uphill"

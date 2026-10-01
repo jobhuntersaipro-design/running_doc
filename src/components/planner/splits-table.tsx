@@ -54,7 +54,32 @@ export function SplitsTable({ plan, zones, startTime }: { plan: Plan; zones: Cou
         Each row is the kilometre that ends at that marker. Pace changes with the hills so the effort stays even and the total
         still hits your goal. Heart rate is an estimate from your zones; set them in the Zones tab.
       </p>
-      <SortableDataTable rows={rows} columns={columns} rowKey="id" caption="Kilometre splits" itemName={{ one: "split", other: "splits" }} />
+      <div className={styles.desktopOnly}>
+        <SortableDataTable rows={rows} columns={columns} rowKey="id" caption="Kilometre splits" itemName={{ one: "split", other: "splits" }} />
+      </div>
+      {/* Phones get one readable card per kilometre instead of a squeezed table. */}
+      <ol className={`${styles.cardList} ${styles.mobileOnly}`} aria-label="Kilometre splits">
+        {rows.map((r) => {
+          const last = r.km === plan.splits.length && plan.splits.at(-1)!.lengthKm < 1;
+          return (
+            <li key={r.id} className={styles.cardItem}>
+              <div className={styles.cardMain}>
+                <span className={styles.cardTitle}>{last ? "Finish" : `Km ${r.km}`}</span>
+                <span className={`${styles.cardValue} ${styles.num}`}>{formatPace(r.pace)}/km</span>
+                <Badge size="sm" tone={r.tag === "push" ? "info" : "neutral"}>{TAG_LABEL[r.tag]}</Badge>
+              </div>
+              <p className={`${styles.cardMeta} ${styles.num}`}>
+                {formatClock(r.total)} at {clockAt(startTime, r.total)}, {r.grade >= 0 ? "+" : ""}
+                {r.grade.toFixed(1)}% grade
+              </p>
+              <p className={`${styles.cardMeta} ${styles.num}`}>
+                Pace Z{r.paceZone}, heart rate {r.hr} bpm (Z{r.hrZone})
+              </p>
+              {r.notes ? <p className={styles.cardNotes}>{r.notes}</p> : null}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

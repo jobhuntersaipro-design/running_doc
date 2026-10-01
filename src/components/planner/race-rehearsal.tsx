@@ -51,6 +51,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const [follow, setFollow] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
   const kmRef = useRef(0);
+  const partListRef = useRef<HTMLOListElement>(null);
   // A new goal time means a new race plan: start the rehearsal again from the start line.
   const [goalSeen, setGoalSeen] = useState(plan.summary.goalSeconds);
   if (goalSeen !== plan.summary.goalSeconds) {
@@ -112,6 +113,14 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     null;
   const group = anchor === null ? [] : plan.events.filter((e) => Math.abs(e.km - anchor) < EPS);
   const part = plan.chapters.find((c) => position >= c.startKm - EPS && position < c.endKm - EPS) ?? plan.chapters[plan.chapters.length - 1];
+
+  // On phones the parts are a swipeable row; keep the current part in view without moving the page.
+  useEffect(() => {
+    const list = partListRef.current;
+    const item = list?.children[part.index] as HTMLElement | undefined;
+    if (!list || !item || list.scrollWidth <= list.clientWidth) return;
+    list.scrollTo({ left: item.offsetLeft - list.offsetLeft, behavior: reduce ? "auto" : "smooth" });
+  }, [part.index, reduce]);
 
   function togglePlay() {
     if (finished) {
@@ -321,7 +330,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
         <h3 id="parts-heading" className={styles.h3}>
           The race in {plan.chapters.length} parts
         </h3>
-        <ol className={styles.partList}>
+        <ol className={styles.partList} ref={partListRef}>
           {plan.chapters.map((c) => (
             <li key={c.index}>
               <button

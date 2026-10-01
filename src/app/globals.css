@@ -1,7 +1,25 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Touch screens get 44px controls (Arc's touch target size) instead of the compact 36px. */
+@media (pointer: coarse) {
+  :root {
+    --control-height-sm: var(--control-height-md);
+  }
+}
+
 html,
 body {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {

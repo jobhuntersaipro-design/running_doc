@@ -56,7 +56,32 @@ export function HillsTable({ plan }: { plan: Plan }) {
         up for the missing air resistance on a belt.
       </p>
       {rows.length ? (
-        <SortableDataTable rows={rows} columns={columns} rowKey="id" caption="Uphills and downhills" itemName={{ one: "hill", other: "hills" }} />
+        <>
+          <div className={styles.desktopOnly}>
+            <SortableDataTable rows={rows} columns={columns} rowKey="id" caption="Uphills and downhills" itemName={{ one: "hill", other: "hills" }} />
+          </div>
+          <ol className={`${styles.cardList} ${styles.mobileOnly}`} aria-label="Uphills and downhills">
+            {rows.map((r) => (
+              <li key={r.id} className={styles.cardItem}>
+                <div className={styles.cardMain}>
+                  <span className={styles.cardTitle}>
+                    {r.kind === "uphill" ? "Uphill" : "Downhill"} from km {r.startKm.toFixed(1)}
+                  </span>
+                  <span className={`${styles.cardValue} ${styles.num}`}>
+                    {r.change >= 0 ? "+" : ""}
+                    {Math.round(r.change)} m
+                  </span>
+                </div>
+                <p className={`${styles.cardMeta} ${styles.num}`}>
+                  {r.elevation} over {r.lengthKm.toFixed(1)} km, {signed(r.avgGrade)} (steepest {signed(r.steepest)})
+                </p>
+                <p className={`${styles.cardNotes} ${styles.num}`}>
+                  {formatPace(r.pace)}/km target{r.incline === null ? ", practise outdoors" : `, treadmill ${r.incline}% incline`}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </>
       ) : (
         <p className={styles.muted}>This course is flat enough that no uphill or downhill needs its own plan.</p>
       )}
