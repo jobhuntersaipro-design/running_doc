@@ -36,10 +36,10 @@ function r2(): R2Config | null {
   if (r2Cache !== undefined) return r2Cache;
   // Values pasted into a dashboard often carry spaces or a trailing newline.
   const env = (name: string) => (process.env[name] ?? "").trim();
-  let accountId = env("R2_ACCOUNT_ID");
-  // Accept the whole S3 API URL too: https://<account id>.r2.cloudflarestorage.com/<bucket>
-  const fromUrl = /([0-9a-f]{32})\.(?:[a-z]+\.)?r2\.cloudflarestorage\.com/i.exec(accountId);
-  if (fromUrl) accountId = fromUrl[1];
+  // Account IDs are 32 hex characters. Take them out of whatever was pasted: the bare ID, the
+  // S3 API URL (https://<id>.r2.cloudflarestorage.com/<bucket>) or a dashboard link.
+  const rawAccount = env("R2_ACCOUNT_ID");
+  const accountId = /[0-9a-f]{32}/i.exec(rawAccount)?.[0] ?? rawAccount;
   const accessKeyId = env("R2_ACCESS_KEY_ID");
   const secretAccessKey = env("R2_SECRET_ACCESS_KEY");
   const bucket = env("R2_BUCKET");
