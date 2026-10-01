@@ -1154,3 +1154,121 @@
     opacity: 1;
   }
 }
+
+/* Live value in each chart header, and a map that fills the height of the chart column */
+
+.chartValue {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.chartHead .legend {
+  flex-basis: 100%;
+}
+
+@media (min-width: 981px) {
+  .rehearsalGrid {
+    align-items: stretch;
+  }
+  .mapWrap,
+  .mapFrame {
+    display: grid;
+    height: 100%;
+  }
+  .mapFrame {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .mapBox,
+  .mapBox .map {
+    height: 100%;
+    min-height: 420px;
+  }
+}
+
+/* Average finish times */
+
+.benchmarks {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.sourceLink {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.benchStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.benchStats dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.benchStats dd {
+  margin: 2px 0 0;
+  font-size: var(--text-xl);
+}
+
+.benchStats [data-goal] dd {
+  color: var(--accent);
+}
+
+.benchScale {
+  position: relative;
+  height: 44px;
+  margin: 0 var(--space-4);
+}
+
+.benchTrack {
+  position: absolute;
+  inset: 8px 0 auto 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-muted);
+}
+
+.benchMark {
+  position: absolute;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+}
+
+.benchDot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.benchMark[data-kind="goal"] .benchDot {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  background: var(--accent);
+}
+
+.benchLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.benchMark[data-kind="goal"] .benchLabel {
+  color: var(--foreground);
+  font-weight: 500;
+}
+

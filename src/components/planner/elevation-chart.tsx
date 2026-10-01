@@ -6,7 +6,7 @@ import { RouteLegend } from "./route-legend";
 import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
-const HEIGHT = 168;
+const HEIGHT = 200;
 /** Right padding matches the zone charts below so distances line up. */
 const PAD = { left: 40, right: 34 as number, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
@@ -94,7 +94,14 @@ export function ElevationChart({
   return (
     <figure className={styles.chart}>
       <figcaption className={styles.chartHead}>
-        <span className={styles.h3}>Elevation and hills</span>
+        <span className={styles.h3}>Elevation</span>
+        <span className={`${styles.chartValue} ${styles.num}`}>
+          {(() => {
+            const at = hover ?? km;
+            const grade = plan.profile[Math.min(plan.profile.length - 1, Math.round((at / total) * (plan.profile.length - 1)))].grade;
+            return `${Math.round(elevationAt(plan.profile, at))} m, ${grade >= 0 ? "+" : ""}${grade.toFixed(1)}% at km ${at.toFixed(1)}`;
+          })()}
+        </span>
         <ul className={styles.legend} aria-label="Chart legend">
           <RouteLegend colorBy="hills" />
           <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
