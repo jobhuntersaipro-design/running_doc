@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "plan": "tsx scripts/print-plan.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -20,11 +22,13 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^22.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
-    "typescript": "^5"
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   }
 }
