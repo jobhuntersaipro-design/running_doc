@@ -1154,3 +1154,321 @@
     opacity: 1;
   }
 }
+
+/* Live value in each chart header, and a map that fills the height of the chart column */
+
+.chartValue {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.chartHead .legend {
+  flex-basis: 100%;
+}
+
+@media (min-width: 981px) {
+  .rehearsalGrid {
+    align-items: stretch;
+  }
+  .mapWrap,
+  .mapFrame {
+    display: grid;
+    height: 100%;
+  }
+  .mapFrame {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .mapBox,
+  .mapBox .map {
+    height: 100%;
+    min-height: 420px;
+  }
+}
+
+/* Average finish times */
+
+.benchmarks {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.sourceLink {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.benchStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.benchStats dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.benchStats dd {
+  margin: 2px 0 0;
+  font-size: var(--text-xl);
+}
+
+.benchStats [data-goal] dd {
+  color: var(--accent);
+}
+
+.benchScale {
+  position: relative;
+  height: 44px;
+  margin: 0 var(--space-4);
+}
+
+.benchTrack {
+  position: absolute;
+  inset: 8px 0 auto 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-muted);
+}
+
+.benchMark {
+  position: absolute;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+}
+
+.benchDot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.benchMark[data-kind="goal"] .benchDot {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  background: var(--accent);
+}
+
+.benchLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.benchMark[data-kind="goal"] .benchLabel {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* Mobile first: most runners plan on their phone.                     */
+/* ------------------------------------------------------------------ */
+
+.title {
+  font-size: clamp(var(--text-2xl), 7vw, var(--text-3xl));
+}
+
+.mobileOnly {
+  display: none;
+}
+
+.kpiStrip {
+  display: none;
+}
+
+/* Keep the plan tabs reachable while reading a long tab. Arc's tab shell is the first child of the tabs root. */
+.tabs > :first-child {
+  position: sticky;
+  top: calc(var(--space-2) + env(safe-area-inset-top));
+  z-index: 6;
+  box-shadow: 0 0 0 var(--space-2) var(--background);
+}
+
+/* Card lists that replace wide tables on phones */
+.cardList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.cardItem {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+}
+
+.cardItem + .cardItem {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cardMain {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cardTitle {
+  font-weight: 500;
+}
+
+.cardValue {
+  margin-right: auto;
+  font-size: var(--text-lg);
+}
+
+.cardMeta {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.cardNotes {
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 640px) {
+  .page {
+    gap: var(--space-6);
+    padding-top: var(--space-6);
+    padding-bottom: calc(var(--space-12) + env(safe-area-inset-bottom));
+  }
+
+  .desktopOnly {
+    display: none;
+  }
+
+  .mobileOnly {
+    display: block;
+  }
+
+  /* One compact row of three numbers instead of three tall cards */
+  .kpis {
+    display: none;
+  }
+
+  .kpiStrip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+  }
+
+  .kpiStrip > div {
+    padding: var(--space-3) var(--space-4);
+    min-width: 0;
+  }
+
+  .kpiStrip > div + div {
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .kpiStrip dt {
+    color: var(--text-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .kpiStrip dd {
+    margin: 2px 0 0;
+    font-size: var(--text-xl);
+  }
+
+  .fieldRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .simpleTable th,
+  .simpleTable td {
+    padding: var(--space-2) var(--space-3);
+    white-space: normal;
+  }
+
+  .benchmarks {
+    padding: var(--space-4);
+  }
+
+  .benchStats dd {
+    font-size: var(--text-lg);
+  }
+
+  /* The chart legend repeats the map legend just above it */
+  .chartHead .legend {
+    display: none;
+  }
+
+  .map,
+  .mapPlaceholder {
+    height: clamp(280px, 78vw, 360px);
+  }
+
+  /* Race parts become a swipeable row */
+  .partList {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: var(--space-1);
+  }
+
+  .partList > li {
+    scroll-snap-align: start;
+  }
+}
+
+/* Rehearsal order on phones and tablets: map, play bar, what is happening now, then the detail. */
+@media (max-width: 980px) {
+  .rehearsal {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-4);
+  }
+
+  .rehearsalGrid,
+  .nowRow {
+    display: contents;
+  }
+
+  .rehearsal > .sectionHead { order: 0; }
+  .mapWrap { order: 1; }
+  .callout { order: 2; }
+  .toolbar { order: 3; }
+  .nowPanel { order: 4; }
+  .charts { order: 5; }
+  .parts { order: 6; }
+  /* Last in the flow so position: sticky keeps it pinned to the bottom of the screen
+     the whole time the rehearsal is in view. */
+  .controls { order: 7; }
+
+  /* Play, back and the race slider stay at hand while scrolling the rehearsal */
+  .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border-subtle);
+    background: var(--surface);
+  }
+
+  .controls .progress {
+    flex-basis: 100%;
+  }
+}

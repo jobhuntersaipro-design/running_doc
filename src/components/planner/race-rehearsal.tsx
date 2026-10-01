@@ -7,7 +7,7 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
-import { Progress } from "@/components/arc/progress/progress";
+import { Slider } from "@/components/arc/slider/slider";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
@@ -51,6 +51,15 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const [follow, setFollow] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
   const kmRef = useRef(0);
+  const partListRef = useRef<HTMLOListElement>(null);
+  // A new goal time means a new race plan: start the rehearsal again from the start line.
+  const [goalSeen, setGoalSeen] = useState(plan.summary.goalSeconds);
+  if (goalSeen !== plan.summary.goalSeconds) {
+    setGoalSeen(plan.summary.goalSeconds);
+    setKm(0);
+    setStoppedAt(null);
+    setPlaying(true);
+  }
   const reduce = useReducedMotion();
 
   useEffect(() => {
@@ -104,6 +113,14 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     null;
   const group = anchor === null ? [] : plan.events.filter((e) => Math.abs(e.km - anchor) < EPS);
   const part = plan.chapters.find((c) => position >= c.startKm - EPS && position < c.endKm - EPS) ?? plan.chapters[plan.chapters.length - 1];
+
+  // On phones the parts are a swipeable row; keep the current part in view without moving the page.
+  useEffect(() => {
+    const list = partListRef.current;
+    const item = list?.children[part.index] as HTMLElement | undefined;
+    if (!list || !item || list.scrollWidth <= list.clientWidth) return;
+    list.scrollTo({ left: item.offsetLeft - list.offsetLeft, behavior: reduce ? "auto" : "smooth" });
+  }, [part.index, reduce]);
 
   function togglePlay() {
     if (finished) {
@@ -162,7 +179,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
         <div className={styles.charts}>
         <ElevationChart plan={plan} km={position} onScrub={scrub} hover={hover} onHover={setHover} activeEvents={group} />
         <ZoneChart
-          title="Pace zone"
+          title="Pace"
           points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.pace }))}
           runs={zones.paceRuns}
           bands={zones.paceZones.map((z) => ({ zone: z.zone, name: z.name, from: z.slowest, to: z.fastest }))}
@@ -179,7 +196,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
           onScrub={scrub}
         />
         <ZoneChart
-          title="Heart rate zone, estimated"
+          title="Heart rate, estimated"
           points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.hr }))}
           runs={zones.hrRuns}
           bands={zones.hrZones.map((z) => ({ zone: z.zone, name: z.name, from: z.min, to: z.max + 1 }))}
@@ -213,7 +230,16 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
         <Button variant="ghost" onClick={() => scrub(0)} disabled={position === 0}>
           Back to start
         </Button>
-        <Progress className={styles.progress} value={position} max={total} label="Race progress" showValue />
+        <Slider
+          className={styles.progress}
+          label="Race progress, drag to any point"
+          value={Number(position.toFixed(1))}
+          min={0}
+          max={Number(total.toFixed(1))}
+          step={0.1}
+          format={(v) => `${v.toFixed(1)} km`}
+          onValueChange={(v) => scrub(Math.min(total, v))}
+        />
       </div>
 
       <div className={styles.nowRow}>
@@ -304,7 +330,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
         <h3 id="parts-heading" className={styles.h3}>
           The race in {plan.chapters.length} parts
         </h3>
-        <ol className={styles.partList}>
+        <ol className={styles.partList} ref={partListRef}>
           {plan.chapters.map((c) => (
             <li key={c.index}>
               <button

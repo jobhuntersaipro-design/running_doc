@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { ZoneNumber } from "@/lib/planner";
 import styles from "./planner.module.css";
 
-const HEIGHT = 116;
+const HEIGHT = 150;
 /** Right padding matches the elevation chart so distances line up; zone names sit in it. */
 const PAD = { left: 40, right: 34 as number, top: 10, bottom: 26 };
 
@@ -119,6 +119,7 @@ export function ZoneChart({
     <figure className={styles.chart}>
       <figcaption className={styles.chartHead}>
         <span className={styles.h3}>{title}</span>
+        <span className={`${styles.chartValue} ${styles.num}`}>{describe(hover ?? km)}</span>
       </figcaption>
       <div ref={wrap} className={styles.chartArea}>
         <svg

@@ -11,6 +11,7 @@ import { TimePicker } from "@/components/arc/time-picker/time-picker";
 import type { CourseInput } from "@/lib/courses/types";
 import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
 import { CourseSetup } from "./course-setup";
+import { FinishBenchmarks } from "./finish-benchmarks";
 import { FuelPlan } from "./fuel-plan";
 import { HillsTable } from "./hills-table";
 import { PaceBand } from "./pace-band";
@@ -196,6 +197,23 @@ export function Planner({ example }: { example: CourseInput }) {
               {cutoff && cutoffArrival ? ` You reach the km ${cutoff.km} cutoff around ${cutoffArrival}; it closes at ${cutoff.clock}.` : ""}
             </p>
           </section>
+
+          <FinishBenchmarks km={summary.totalKm} goalSeconds={summary.goalSeconds} />
+
+          <dl className={styles.kpiStrip} aria-label="Plan at a glance">
+            <div>
+              <dt>Total uphill</dt>
+              <dd className={styles.num}>{Math.round(summary.totalGain)} m</dd>
+            </div>
+            <div>
+              <dt>Gels</dt>
+              <dd className={styles.num}>{gels.length}</dd>
+            </div>
+            <div>
+              <dt>Drink stops</dt>
+              <dd className={styles.num}>{drinks.length}</dd>
+            </div>
+          </dl>
 
           <section className={styles.kpis} aria-label="Plan at a glance">
             <MetricCard
