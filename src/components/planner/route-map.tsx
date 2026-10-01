@@ -251,6 +251,8 @@ export default function RouteMap({
   const [eventEl] = useState(() => document.createElement("div"));
   const bearingRef = useRef(0);
   const loadedTheme = useRef<Theme | null>(null);
+  // False from setStyle until its style.load: MapLibre throws if a loading style is restyled.
+  const styleReady = useRef(false);
   // Bumps every time a style (basemap or fallback) finishes loading with our overlay on top.
   const [styleVersion, setStyleVersion] = useState(0);
   const [tiles, setTiles] = useState<Record<string, "ok" | "failed">>({});
@@ -285,6 +287,7 @@ export default function RouteMap({
     map.on("style.load", () => {
       const { plan: p2, km: k, runs: r2 } = latest.current;
       addOverlay(map, p2, r2, k);
+      styleReady.current = true;
       runnerRef.current?.setLngLat(pointAt(p2.track, k)).addTo(map);
       setStyleVersion((v) => v + 1);
     });
@@ -315,6 +318,7 @@ export default function RouteMap({
     if (!map || loadedTheme.current === theme) return;
     loadedTheme.current = theme;
     setTiles({});
+    styleReady.current = false;
     map.setStyle(BASEMAP[theme], { diff: false });
   }, [theme]);
 
@@ -325,17 +329,19 @@ export default function RouteMap({
     const timer = window.setTimeout(() => {
       if (!map.getSource("route")) {
         setTiles((t) => ({ ...t, basemap: "failed" }));
+        styleReady.current = false;
         map.setStyle(FALLBACK_STYLE, { diff: false });
       }
     }, BASEMAP_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [theme]);
 
-  // Map style and token colours
+  // Map style and token colours. A theme change swaps the basemap, and the colours follow on its
+  // style.load (styleVersion). Styling a basemap that is still loading throws, so wait for it.
   useEffect(() => {
     const map = mapRef.current;
-    if (map && styleVersion > 0) applyStyle(map, mapStyle);
-  }, [styleVersion, mapStyle, theme]);
+    if (map && styleVersion > 0 && styleReady.current) applyStyle(map, mapStyle);
+  }, [styleVersion, mapStyle]);
 
   // Route data
   const runsKey = runs.map((r) => `${r.key}:${r.startKm.toFixed(2)}`).join("|");
