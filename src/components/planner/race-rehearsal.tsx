@@ -11,10 +11,11 @@ import { Progress } from "@/components/arc/progress/progress";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { HR_ZONE_NAMES, PACE_ZONE_NAMES, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
+import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
+import { EventIcon } from "./event-icon";
+import { ZoneChart } from "./zone-chart";
 import type { MapStyle } from "./route-map";
-import type { ColorBy } from "./zone-style";
 import { TAG_LABEL, clockAt, paceAt } from "./util";
 import styles from "./planner.module.css";
 
@@ -27,12 +28,6 @@ const PLAYBACK = [
   { value: "30", label: "30 s" },
   { value: "60", label: "1 min" },
   { value: "180", label: "3 min" },
-];
-
-const COLOR_BY: { value: ColorBy; label: string }[] = [
-  { value: "hills", label: "Hills" },
-  { value: "pace", label: "Pace zone" },
-  { value: "hr", label: "Heart rate zone" },
 ];
 
 const MAP_STYLES: { value: MapStyle; label: string }[] = [
@@ -54,7 +49,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>("streets");
   const [follow, setFollow] = useState(false);
-  const [colorBy, setColorBy] = useState<ColorBy>("hills");
+  const [hover, setHover] = useState<number | null>(null);
   const kmRef = useRef(0);
   const reduce = useReducedMotion();
 
@@ -108,6 +103,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     [...plan.events].reverse().find((e) => e.km <= position + EPS && position - e.km < CALLOUT_KM && (position > 0 || e.type === "start"))?.km ??
     null;
   const group = anchor === null ? [] : plan.events.filter((e) => Math.abs(e.km - anchor) < EPS);
+  const part = plan.chapters.find((c) => position >= c.startKm - EPS && position < c.endKm - EPS) ?? plan.chapters[plan.chapters.length - 1];
 
   function togglePlay() {
     if (finished) {
@@ -131,14 +127,16 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     <section className={styles.rehearsal} aria-labelledby="rehearsal-heading">
       <div className={styles.sectionHead}>
         <h2 id="rehearsal-heading" className={styles.h2}>Race rehearsal</h2>
-        <SegmentedControl label="Playback length" value={length} onValueChange={setLength} options={PLAYBACK} />
+        <div className={styles.playbackControl}>
+          <span className={styles.muted}>
+            Replay the whole race in
+          </span>
+          <SegmentedControl label="Replay the whole race in" value={length} onValueChange={setLength} options={PLAYBACK} />
+        </div>
       </div>
 
       <div className={styles.toolbar}>
-        <div className={styles.toolbarGroup}>
-          <SegmentedControl label="Map style" value={mapStyle} onValueChange={(v) => setMapStyle(v as MapStyle)} options={MAP_STYLES} />
-          <SegmentedControl label="Color route by" value={colorBy} onValueChange={(v) => setColorBy(v as ColorBy)} options={COLOR_BY} />
-        </div>
+        <SegmentedControl label="Map style" value={mapStyle} onValueChange={(v) => setMapStyle(v as MapStyle)} options={MAP_STYLES} />
         <div className={styles.switches}>
           <Switch label="Pause at each event" checked={pauseAtEvents} onCheckedChange={setPauseAtEvents} />
           <Switch label="Follow runner in 3D" checked={follow} onCheckedChange={setFollow} />
@@ -155,7 +153,8 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
             follow={follow}
             popupEvents={stoppedAt !== null ? group : []}
             zones={zones}
-            colorBy={colorBy}
+            colorBy="hills"
+            activeEvents={group}
           />
         </div>
 
@@ -198,6 +197,13 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
           <div className={styles.effortRow}>
             <span className={styles.muted}>Effort for km {split.km}</span>
             <Badge tone={split.tag === "push" ? "info" : "neutral"}>{TAG_LABEL[split.tag]}</Badge>
+          </div>
+
+          <div className={styles.partNow}>
+            <p className={styles.partNowTitle}>
+              Part {part.index + 1} of {plan.chapters.length}: {part.title}
+            </p>
+            <p className={styles.muted}>{part.focus}</p>
           </div>
 
           <div className={styles.callout} aria-live="polite">
@@ -252,7 +258,75 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
         <Progress className={styles.progress} value={position} max={total} label="Race progress" showValue />
       </div>
 
-      <ElevationChart plan={plan} km={position} onScrub={scrub} zones={zones} colorBy={colorBy} />
+      <div className={styles.charts}>
+        <ElevationChart plan={plan} km={position} onScrub={scrub} hover={hover} onHover={setHover} activeEvents={group} />
+        <ZoneChart
+          title="Target pace by zone"
+          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.pace }))}
+          runs={zones.paceRuns}
+          bands={zones.paceZones.map((z) => ({ zone: z.zone, name: z.name, from: z.slowest, to: z.fastest }))}
+          invert
+          format={(v) => formatPace(v)}
+          describe={(k) => {
+            const z = zoneAt(zones, Math.min(k, total - EPS));
+            return `${formatPace(z.pace)}/km, Z${z.paceZone} ${PACE_ZONE_NAMES[z.paceZone - 1].toLowerCase()}`;
+          }}
+          totalKm={total}
+          km={position}
+          hover={hover}
+          onHover={setHover}
+          onScrub={scrub}
+        />
+        <ZoneChart
+          title="Estimated heart rate by zone"
+          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.hr }))}
+          runs={zones.hrRuns}
+          bands={zones.hrZones.map((z) => ({ zone: z.zone, name: z.name, from: z.min, to: z.max + 1 }))}
+          format={(v) => `${Math.round(v)}`}
+          describe={(k) => {
+            const z = zoneAt(zones, Math.min(k, total - EPS));
+            return `About ${z.hr} bpm, Z${z.hrZone} ${HR_ZONE_NAMES[z.hrZone - 1].toLowerCase()}`;
+          }}
+          totalKm={total}
+          km={position}
+          hover={hover}
+          onHover={setHover}
+          onScrub={scrub}
+        />
+        <p className={styles.hint}>
+          Drag along any chart, or focus the elevation chart and use the arrow keys, to move through the race. Set your own zones in
+          the Zones tab.
+        </p>
+      </div>
+
+      <section className={styles.parts} aria-labelledby="parts-heading">
+        <h3 id="parts-heading" className={styles.h3}>
+          The race in {plan.chapters.length} parts
+        </h3>
+        <ol className={styles.partList}>
+          {plan.chapters.map((c) => (
+            <li key={c.index}>
+              <button
+                type="button"
+                className={styles.partCard}
+                data-active={c.index === part.index ? "" : undefined}
+                aria-current={c.index === part.index ? "step" : undefined}
+                onClick={() => scrub(c.startKm)}
+              >
+                <span className={styles.partMeta}>
+                  Part {c.index + 1}, km {c.startKm.toFixed(1)} to {c.endKm.toFixed(1)}
+                </span>
+                <span className={styles.partTitle}>{c.title}</span>
+                <span className={`${styles.partMeta} ${styles.num}`}>
+                  {formatPace(c.paceSecPerKm)}/km, about {averageHr(zones, c.startKm, c.endKm)} bpm
+                </span>
+                <span className={styles.partText}>{c.expect}</span>
+                <span className={styles.partFocus}>{c.focus}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </section>
     </section>
   );
 }
@@ -260,8 +334,18 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
 function EventCard({ event }: { event: PlanEvent }) {
   return (
     <div className={styles.calloutCard}>
-      <p className={styles.calloutTitle}>{event.title}</p>
+      <div className={styles.calloutHead}>
+        <EventIcon type={event.type} size={26} />
+        <p className={styles.calloutTitle}>{event.title}</p>
+      </div>
       <p className={styles.calloutDetail}>{event.detail}</p>
+      {event.feel ? (
+        <p className={styles.calloutDetail}>
+          <span className={styles.calloutLabel}>What you will feel: </span>
+          {event.feel}
+        </p>
+      ) : null}
+      {event.cue ? <p className={styles.cue}>&ldquo;{event.cue}&rdquo;</p> : null}
       {event.hill ? <HillStats hill={event.hill} /> : null}
     </div>
   );

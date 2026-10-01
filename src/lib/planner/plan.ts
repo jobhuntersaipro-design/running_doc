@@ -1,5 +1,6 @@
 import { buildPaceBlocks } from "./blocks";
 import { hillInfo } from "./hills";
+import { addRunnerNotes, buildChapters } from "./mind";
 import { buildFuelEvents, DEFAULT_FUEL, type FuelOptions } from "./fuel";
 import { formatPace } from "./format";
 import { parseGpx } from "./gpx";
@@ -79,7 +80,7 @@ export function buildPlan(input: PlanInput): Plan {
   const paceBetween = (from: number, to: number) => (at(to) - at(from)) / (to - from);
   const hills = segments.map((s) => hillInfo(s, profile, paceBetween)).filter((h): h is HillInfo => h !== null);
 
-  const events: PlanEvent[] = ([
+  const events: PlanEvent[] = addRunnerNotes(([
     {
       type: "start",
       km: 0,
@@ -96,7 +97,7 @@ export function buildPlan(input: PlanInput): Plan {
       title: "Last 2 km",
       detail: "If your legs feel fine, now is the time to lift the effort. Empty the tank to the finish line.",
     },
-  ] as PlanEvent[]).sort((a, b) => a.km - b.km || a.elapsedSeconds - b.elapsedSeconds);
+  ] as PlanEvent[]).sort((a, b) => a.km - b.km || a.elapsedSeconds - b.elapsedSeconds));
 
   const splits: Split[] = [];
   const count = Math.ceil(totalKm - 1e-9);
@@ -136,6 +137,7 @@ export function buildPlan(input: PlanInput): Plan {
     splits,
     events,
     hills,
+    chapters: buildChapters(totalKm, hills, timeline),
     summary: {
       goalSeconds: input.goalSeconds,
       goalPaceSecPerKm: goalPace,

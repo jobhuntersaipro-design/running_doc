@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { LngLatBounds, Map as MapLibreMap, Marker, Popup, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
 import { ZONES, averageHr, formatPace, paceZoneFor, type CourseZones, type Plan, type PlanEvent } from "@/lib/planner";
 import { pointAt } from "./util";
+import { EventIcon } from "./event-icon";
 import { RouteLegend } from "./route-legend";
 import { ZONE_MIX, type ColorBy } from "./zone-style";
 import styles from "./planner.module.css";
@@ -188,6 +190,12 @@ function popupContent(events: PlanEvent[], zones: CourseZones): HTMLElement {
     detail.className = styles.popupDetail;
     detail.textContent = e.detail;
     item.append(title, detail);
+    if (e.cue) {
+      const cue = document.createElement("p");
+      cue.className = styles.popupCue;
+      cue.textContent = `\u201c${e.cue}\u201d`;
+      item.append(cue);
+    }
     if (e.hill) {
       const h = e.hill;
       const facts = document.createElement("p");
@@ -218,9 +226,12 @@ export default function RouteMap({
   popupEvents,
   zones,
   colorBy,
+  activeEvents,
 }: {
   zones: CourseZones;
   colorBy: ColorBy;
+  /** Events the rehearsal is showing now; the first gets an animated pin on the map. */
+  activeEvents: PlanEvent[];
   plan: Plan;
   km: number;
   theme: Theme;
@@ -233,6 +244,9 @@ export default function RouteMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const runnerRef = useRef<Marker | null>(null);
   const popupRef = useRef<Popup | null>(null);
+  const eventMarkerRef = useRef<Marker | null>(null);
+  // This component only renders on the client (dynamic import with ssr off), so document exists.
+  const [eventEl] = useState(() => document.createElement("div"));
   const bearingRef = useRef(0);
   const loadedTheme = useRef<Theme | null>(null);
   // Bumps every time a style (basemap or fallback) finishes loading with our overlay on top.
@@ -356,11 +370,35 @@ export default function RouteMap({
     popupRef.current?.remove();
     popupRef.current = null;
     if (!map || styleVersion === 0 || popupEvents.length === 0) return;
-    popupRef.current = new Popup({ closeButton: true, closeOnClick: false, maxWidth: "280px", offset: 14, className: styles.popup })
+    // Keep the popup clear of the event pin, which stands above the point.
+    const offset = {
+      top: [0, 14],
+      "top-left": [0, 14],
+      "top-right": [0, 14],
+      bottom: [0, -60],
+      "bottom-left": [0, -60],
+      "bottom-right": [0, -60],
+      left: [26, -24],
+      right: [-26, -24],
+      center: [0, 0],
+    } satisfies Record<string, [number, number]>;
+    popupRef.current = new Popup({ closeButton: true, closeOnClick: false, maxWidth: "280px", offset, className: styles.popup })
       .setLngLat(pointAt(plan.track, popupEvents[0].km))
       .setDOMContent(popupContent(popupEvents, zones))
       .addTo(map);
   }, [popupKey, styleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Animated pin for the event being shown
+  const activeKey = activeEvents.length ? `${activeEvents[0].type}-${activeEvents[0].km}` : "";
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || styleVersion === 0 || !activeEvents.length) {
+      eventMarkerRef.current?.remove();
+      return;
+    }
+    eventMarkerRef.current ??= new Marker({ element: eventEl, anchor: "bottom", offset: [0, -6] });
+    eventMarkerRef.current.setLngLat(pointAt(plan.track, activeEvents[0].km)).addTo(map);
+  }, [activeKey, styleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const needed = mapStyle === "satellite" ? ["satellite"] : mapStyle === "terrain" ? ["dem-hillshade"] : ["openmaptiles", "basemap"];
   const failed =
@@ -379,6 +417,7 @@ export default function RouteMap({
     <div className={styles.mapFrame}>
       <div className={styles.mapBox}>
         <div ref={container} className={styles.map} role="img" aria-label="Course map with the runner's position" />
+        {activeEvents.length ? createPortal(<EventIcon type={activeEvents[0].type} pin />, eventEl) : null}
         {failed ? (
           <p className={styles.mapNotice} role="status">
             {PROVIDER[mapStyle]} tiles could not load, so only the route shows. Try another style or check your connection.

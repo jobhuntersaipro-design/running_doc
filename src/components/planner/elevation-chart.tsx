@@ -1,32 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { elevationAt, formatPace, zoneAt, type CourseZones, type Plan } from "@/lib/planner";
+import { elevationAt, formatPace, type Plan, type PlanEvent } from "@/lib/planner";
 import { RouteLegend } from "./route-legend";
-import type { ColorBy } from "./zone-style";
 import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
 const HEIGHT = 200;
-const PAD = { left: 40, right: 12, top: 24, bottom: 48 };
+/** Right padding matches the zone charts below so distances line up. */
+const PAD = { left: 40, right: 92 as number, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
 
 export function ElevationChart({
   plan,
   km,
   onScrub,
-  zones,
-  colorBy,
+  hover,
+  onHover,
+  activeEvents,
 }: {
   plan: Plan;
   km: number;
   onScrub: (km: number) => void;
-  zones: CourseZones;
-  colorBy: ColorBy;
+  /** Shared with the pace and heart rate charts so all three point at the same spot. */
+  hover: number | null;
+  onHover: (km: number | null) => void;
+  /** Events the rehearsal is showing now; they pulse on the chart. */
+  activeEvents: PlanEvent[];
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
-  const [hover, setHover] = useState<number | null>(null);
   const dragging = useRef(false);
 
   useEffect(() => {
@@ -41,7 +44,9 @@ export function ElevationChart({
   const eles = plan.profile.map((p) => p.ele);
   const min = Math.floor((Math.min(...eles) - 3) / 10) * 10;
   const max = Math.ceil((Math.max(...eles) + 3) / 10) * 10;
-  const plotW = width - PAD.left - PAD.right;
+  // Phones drop the right margin (and the zone names in it) to give the line room.
+  const padRight = width < 520 ? 14 : PAD.right;
+  const plotW = width - PAD.left - padRight;
   const baseY = MARKER_ROW - 18;
   const plotH = baseY - PAD.top;
   const x = (k: number) => PAD.left + (k / total) * plotW;
@@ -70,7 +75,7 @@ export function ElevationChart({
   }
   function onPointerMove(e: PointerEvent<SVGSVGElement>) {
     const k = toKm(e.clientX);
-    setHover(k);
+    onHover(k);
     if (dragging.current) onScrub(k);
   }
   function onKeyDown(e: KeyboardEvent<SVGSVGElement>) {
@@ -89,9 +94,9 @@ export function ElevationChart({
   return (
     <figure className={styles.chart}>
       <figcaption className={styles.chartHead}>
-        <span className={styles.h3}>{colorBy === "hills" ? "Elevation and hills" : colorBy === "pace" ? "Elevation by pace zone" : "Elevation by heart rate zone"}</span>
+        <span className={styles.h3}>Elevation and hills</span>
         <ul className={styles.legend} aria-label="Chart legend">
-          <RouteLegend colorBy={colorBy} />
+          <RouteLegend colorBy="hills" />
           <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
           <li><span className={styles.swatchRing} aria-hidden="true" />Drink</li>
         </ul>
@@ -112,12 +117,12 @@ export function ElevationChart({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={() => (dragging.current = false)}
-          onPointerLeave={() => setHover(null)}
+          onPointerLeave={() => onHover(null)}
           onKeyDown={onKeyDown}
         >
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} className={styles.grid} />
+              <line x1={PAD.left} x2={width - padRight} y1={y(t)} y2={y(t)} className={styles.grid} />
               <text x={PAD.left - 8} y={y(t)} className={styles.axisLabel} textAnchor="end" dominantBaseline="middle">
                 {Math.round(t)} m
               </text>
@@ -125,19 +130,15 @@ export function ElevationChart({
           ))}
           <path d={area} className={styles.area} />
           <path d={profilePath} className={styles.profileLine} />
-          {colorBy === "hills"
-            ? plan.segments
-                .filter((s) => s.kind !== "flat")
-                .map((s) => (
-                  <path
-                    key={`${s.kind}-${s.startKm}`}
-                    d={pathFor(s.startKm, s.endKm)}
-                    className={s.kind === "uphill" ? styles.climbLine : styles.descentLine}
-                  />
-                ))
-            : (colorBy === "pace" ? zones.paceRuns : zones.hrRuns).map((r) => (
-                <path key={`z-${r.startKm}`} d={pathFor(r.startKm, r.endKm)} className={`${styles.zoneLine} ${styles[`zone${r.zone}`]}`} />
-              ))}
+          {plan.segments
+            .filter((s) => s.kind !== "flat")
+            .map((s) => (
+              <path
+                key={`${s.kind}-${s.startKm}`}
+                d={pathFor(s.startKm, s.endKm)}
+                className={s.kind === "uphill" ? styles.climbLine : styles.descentLine}
+              />
+            ))}
           {plan.hills
             .filter((h) => h.kind === "uphill")
             .map((h) => (
@@ -156,6 +157,14 @@ export function ElevationChart({
           {gels.map((g) => (
             <circle key={`g-${g.km}`} cx={x(g.km)} cy={MARKER_ROW} r={5} className={styles.gelMark} />
           ))}
+          {activeEvents.slice(0, 1).map((e) => {
+            const onProfile = e.type === "uphill" || e.type === "downhill" || e.type === "start" || e.type === "push";
+            return (
+              <g key={`active-${e.type}-${e.km}`} className={styles[`event_${e.type}`]}>
+                <circle cx={x(e.km)} cy={onProfile ? y(elevationAt(plan.profile, e.km)) : MARKER_ROW} r={9} className={styles.chartPulse} />
+              </g>
+            );
+          })}
           {hover !== null ? (
             <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={baseY} className={styles.crosshair} />
           ) : null}
@@ -173,10 +182,7 @@ export function ElevationChart({
               {Math.round(elevationAt(plan.profile, hover))} m, {hoverGrade >= 0 ? "+" : ""}
               {hoverGrade.toFixed(1)}%
             </span>
-            <span className={styles.num}>{formatPace(paceAt(plan, hover))}/km, pace Z{zoneAt(zones, hover).paceZone}</span>
-            <span className={styles.num}>
-              About {zoneAt(zones, hover).hr} bpm, Z{zoneAt(zones, hover).hrZone}
-            </span>
+            <span className={styles.num}>{formatPace(paceAt(plan, hover))}/km target</span>
           </div>
         ) : null}
       </div>
