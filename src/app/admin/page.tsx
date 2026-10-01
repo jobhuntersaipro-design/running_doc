@@ -55,7 +55,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
 
       {!storageReady() ? (
         <p className={styles.notice} role="status">
-          File storage is not set up, so new races cannot be saved. Connect a Vercel Blob store to this project, then redeploy.
+          File storage is not set up, so new races cannot be saved. Add the R2 settings to the environment variables, then redeploy.
         </p>
       ) : null}
 

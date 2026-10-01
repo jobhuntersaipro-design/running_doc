@@ -96,7 +96,7 @@ async function loadRecords(): Promise<Map<string, RaceRecord>> {
 }
 
 /**
- * Saves a record. Each save is a new file (Blob caches public files at the
+ * Saves a record. Each save is a new file (public files can be cached at the
  * edge, so overwriting in place could serve the old version for a while), and
  * older copies are removed afterwards.
  */

@@ -38,7 +38,7 @@ export function Overview({ races }: { races: RaceCardData[] }) {
             <Link href={`/races/${r.id}`} className={styles.cardMain}>
               {r.coverUrl ? (
                 <div className={styles.coverWrap}>
-                  {/* Covers come from Blob or /api/files, so a plain img avoids image optimizer host config. */}
+                  {/* Covers come from R2 or /api/files, so a plain img avoids image optimizer host config. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={r.coverUrl} alt="" className={styles.cover} loading="lazy" decoding="async" />
                   <span className={styles.routeInset} aria-hidden="true">
