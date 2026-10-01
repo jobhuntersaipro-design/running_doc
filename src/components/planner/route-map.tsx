@@ -186,10 +186,8 @@ function popupContent(events: PlanEvent[], zones: CourseZones): HTMLElement {
     const title = document.createElement("p");
     title.className = styles.popupTitle;
     title.textContent = `Km ${e.km.toFixed(1)}: ${e.title}`;
-    const detail = document.createElement("p");
-    detail.className = styles.popupDetail;
-    detail.textContent = e.detail;
-    item.append(title, detail);
+    // The full description is in the event card beside the map; the popup stays short.
+    item.append(title);
     if (e.cue) {
       const cue = document.createElement("p");
       cue.className = styles.popupCue;

@@ -4,9 +4,9 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { ZoneNumber } from "@/lib/planner";
 import styles from "./planner.module.css";
 
-const HEIGHT = 150;
+const HEIGHT = 116;
 /** Right padding matches the elevation chart so distances line up; zone names sit in it. */
-const PAD = { left: 40, right: 92 as number, top: 10, bottom: 26 };
+const PAD = { left: 40, right: 34 as number, top: 10, bottom: 26 };
 
 export interface ZoneChartPoint {
   startKm: number;
@@ -78,7 +78,7 @@ export function ZoneChart({
   const lo = Math.min(...values) - Math.max(4, span * 0.25);
   const hi = Math.max(...values) + Math.max(4, span * 0.25);
   // Phones drop the right margin (and the zone names in it) to give the line room.
-  const padRight = width < 520 ? 14 : PAD.right;
+  const padRight = width < 360 ? 12 : PAD.right;
   const plotW = width - PAD.left - padRight;
   const plotH = HEIGHT - PAD.top - PAD.bottom;
   const x = (k: number) => PAD.left + (k / totalKm) * plotW;
@@ -136,9 +136,9 @@ export function ZoneChart({
           {visible.map((b) => (
             <g key={b.zone} className={styles[`zone${b.zone}`]}>
               <rect x={PAD.left} width={plotW} y={b.y0} height={b.y1 - b.y0} className={styles.zoneBand} />
-              {b.y1 - b.y0 >= 12 && padRight > 14 ? (
+              {b.y1 - b.y0 >= 10 && padRight > 12 ? (
                 <text x={width - padRight + 8} y={(b.y0 + b.y1) / 2} className={styles.bandLabel} dominantBaseline="middle">
-                  Z{b.zone} {b.name.toLowerCase()}
+                  Z{b.zone}
                 </text>
               ) : null}
             </g>

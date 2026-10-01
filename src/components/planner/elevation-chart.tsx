@@ -6,9 +6,9 @@ import { RouteLegend } from "./route-legend";
 import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
-const HEIGHT = 200;
+const HEIGHT = 168;
 /** Right padding matches the zone charts below so distances line up. */
-const PAD = { left: 40, right: 92 as number, top: 24, bottom: 48 };
+const PAD = { left: 40, right: 34 as number, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
 
 export function ElevationChart({
@@ -45,7 +45,7 @@ export function ElevationChart({
   const min = Math.floor((Math.min(...eles) - 3) / 10) * 10;
   const max = Math.ceil((Math.max(...eles) + 3) / 10) * 10;
   // Phones drop the right margin (and the zone names in it) to give the line room.
-  const padRight = width < 520 ? 14 : PAD.right;
+  const padRight = width < 360 ? 12 : PAD.right;
   const plotW = width - PAD.left - padRight;
   const baseY = MARKER_ROW - 18;
   const plotH = baseY - PAD.top;
@@ -186,7 +186,6 @@ export function ElevationChart({
           </div>
         ) : null}
       </div>
-      <p className={styles.hint}>Drag along the chart, or focus it and use the arrow keys, to move through the race.</p>
     </figure>
   );
 }

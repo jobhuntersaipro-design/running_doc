@@ -158,6 +158,65 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
           />
         </div>
 
+
+        <div className={styles.charts}>
+        <ElevationChart plan={plan} km={position} onScrub={scrub} hover={hover} onHover={setHover} activeEvents={group} />
+        <ZoneChart
+          title="Pace zone"
+          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.pace }))}
+          runs={zones.paceRuns}
+          bands={zones.paceZones.map((z) => ({ zone: z.zone, name: z.name, from: z.slowest, to: z.fastest }))}
+          invert
+          format={(v) => formatPace(v)}
+          describe={(k) => {
+            const z = zoneAt(zones, Math.min(k, total - EPS));
+            return `${formatPace(z.pace)}/km, Z${z.paceZone} ${PACE_ZONE_NAMES[z.paceZone - 1].toLowerCase()}`;
+          }}
+          totalKm={total}
+          km={position}
+          hover={hover}
+          onHover={setHover}
+          onScrub={scrub}
+        />
+        <ZoneChart
+          title="Heart rate zone, estimated"
+          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.hr }))}
+          runs={zones.hrRuns}
+          bands={zones.hrZones.map((z) => ({ zone: z.zone, name: z.name, from: z.min, to: z.max + 1 }))}
+          format={(v) => `${Math.round(v)}`}
+          describe={(k) => {
+            const z = zoneAt(zones, Math.min(k, total - EPS));
+            return `About ${z.hr} bpm, Z${z.hrZone} ${HR_ZONE_NAMES[z.hrZone - 1].toLowerCase()}`;
+          }}
+          totalKm={total}
+          km={position}
+          hover={hover}
+          onHover={setHover}
+          onScrub={scrub}
+        />
+        <p className={styles.hint}>Drag along a chart to move through the race. Set your own zones in the Zones tab.</p>
+      </div>
+
+      </div>
+
+      <div className={styles.controls}>
+        <Button variant="primary" onClick={togglePlay}>
+          {playing ? (
+            <Pause size={16} strokeWidth={1.75} aria-hidden="true" />
+          ) : finished ? (
+            <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <Play size={16} strokeWidth={1.75} aria-hidden="true" />
+          )}
+          {playLabel}
+        </Button>
+        <Button variant="ghost" onClick={() => scrub(0)} disabled={position === 0}>
+          Back to start
+        </Button>
+        <Progress className={styles.progress} value={position} max={total} label="Race progress" showValue />
+      </div>
+
+      <div className={styles.nowRow}>
         <div className={styles.nowPanel}>
           <dl className={styles.nowStats}>
             <div>
@@ -206,7 +265,8 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
             <p className={styles.muted}>{part.focus}</p>
           </div>
 
-          <div className={styles.callout} aria-live="polite">
+        </div>
+        <div className={styles.callout} aria-live="polite">
             <AnimatePresence mode="popLayout" initial={false}>
               {group.length ? (
                 <motion.div
@@ -238,65 +298,6 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
               )}
             </AnimatePresence>
           </div>
-        </div>
-      </div>
-
-      <div className={styles.controls}>
-        <Button variant="primary" onClick={togglePlay}>
-          {playing ? (
-            <Pause size={16} strokeWidth={1.75} aria-hidden="true" />
-          ) : finished ? (
-            <RotateCcw size={16} strokeWidth={1.75} aria-hidden="true" />
-          ) : (
-            <Play size={16} strokeWidth={1.75} aria-hidden="true" />
-          )}
-          {playLabel}
-        </Button>
-        <Button variant="ghost" onClick={() => scrub(0)} disabled={position === 0}>
-          Back to start
-        </Button>
-        <Progress className={styles.progress} value={position} max={total} label="Race progress" showValue />
-      </div>
-
-      <div className={styles.charts}>
-        <ElevationChart plan={plan} km={position} onScrub={scrub} hover={hover} onHover={setHover} activeEvents={group} />
-        <ZoneChart
-          title="Target pace by zone"
-          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.pace }))}
-          runs={zones.paceRuns}
-          bands={zones.paceZones.map((z) => ({ zone: z.zone, name: z.name, from: z.slowest, to: z.fastest }))}
-          invert
-          format={(v) => formatPace(v)}
-          describe={(k) => {
-            const z = zoneAt(zones, Math.min(k, total - EPS));
-            return `${formatPace(z.pace)}/km, Z${z.paceZone} ${PACE_ZONE_NAMES[z.paceZone - 1].toLowerCase()}`;
-          }}
-          totalKm={total}
-          km={position}
-          hover={hover}
-          onHover={setHover}
-          onScrub={scrub}
-        />
-        <ZoneChart
-          title="Estimated heart rate by zone"
-          points={zones.intervals.map((i) => ({ startKm: i.startKm, endKm: i.endKm, value: i.hr }))}
-          runs={zones.hrRuns}
-          bands={zones.hrZones.map((z) => ({ zone: z.zone, name: z.name, from: z.min, to: z.max + 1 }))}
-          format={(v) => `${Math.round(v)}`}
-          describe={(k) => {
-            const z = zoneAt(zones, Math.min(k, total - EPS));
-            return `About ${z.hr} bpm, Z${z.hrZone} ${HR_ZONE_NAMES[z.hrZone - 1].toLowerCase()}`;
-          }}
-          totalKm={total}
-          km={position}
-          hover={hover}
-          onHover={setHover}
-          onScrub={scrub}
-        />
-        <p className={styles.hint}>
-          Drag along any chart, or focus the elevation chart and use the arrow keys, to move through the race. Set your own zones in
-          the Zones tab.
-        </p>
       </div>
 
       <section className={styles.parts} aria-labelledby="parts-heading">
