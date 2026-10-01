@@ -12,7 +12,7 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-/** Serves files saved to .data when no Blob store is connected (local development). */
+/** Serves files saved to .data when R2 is not set up (local development). */
 export async function GET(_req: Request, ctx: RouteContext<"/api/files/[...path]">) {
   const { path: parts } = await ctx.params;
   const file = localPath(parts.join("/"));

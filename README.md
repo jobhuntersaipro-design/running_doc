@@ -19,9 +19,20 @@ The first race is the 2026 KL Marathon half marathon. Its aid station distances 
 
 ### Adding a race
 
+The easy way is `/admin`: sign in, then add the race's details, course GPX, route map PDF and card cover. It shows on the overview straight away.
+
+To build a race into the code instead:
+
 1. Put its files in `public/races/<id>/` (`course.gpx`, plus any route map PDF).
 2. Add a config like `src/lib/courses/klscm-2026-hm.ts` (event, date, location, official link, files, distance, start time, aid stations).
-3. Add it to `RACES` in `src/lib/courses/index.ts`. The overview card and the race page are generated at build time.
+3. Add it to `RACES` in `src/lib/courses/index.ts`.
+
+### Admin and file storage
+
+Copy `.env.example` to `.env.local` and fill it in. In production, set the same variables in the Vercel project.
+
+- **Admin login:** `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` (make it with `node scripts/hash-password.mjs`) and `AUTH_SECRET` (any long random string). The password itself is never stored.
+- **Cloudflare R2:** race details, GPX, PDFs and cover images go to an R2 bucket when the `R2_*` variables are set. Without them, files go to the gitignored `.data` folder, which works locally but not on Vercel.
 
 ## Run it
 
