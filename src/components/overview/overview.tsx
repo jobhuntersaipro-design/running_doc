@@ -2,23 +2,13 @@ import Link from "next/link";
 import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
 import { RoutePreview } from "@/components/site/route-preview";
 import { SiteHeader } from "@/components/site/site-header";
-import type { RaceFile } from "@/lib/courses/types";
+import type { RaceCard } from "@/lib/server/races";
 import styles from "./overview.module.css";
 
-export interface RaceCardData {
-  id: string;
-  event: string;
-  category: string;
-  dateLabel: string;
-  location: string;
-  startTime?: string;
-  officialUrl: string;
-  files: RaceFile[];
-  km: number;
-  gainM: number;
-  drinkStops: number;
-  preview: { d: string; start: [number, number]; finish: [number, number] };
-}
+export type RaceCardData = Pick<
+  RaceCard,
+  "id" | "event" | "category" | "dateLabel" | "location" | "startTime" | "officialUrl" | "files" | "km" | "gainM" | "drinkStops" | "preview" | "coverUrl"
+>;
 
 function startLabel(hhmm?: string) {
   if (!hhmm) return null;
@@ -46,9 +36,20 @@ export function Overview({ races }: { races: RaceCardData[] }) {
         {races.map((r) => (
           <li key={r.id} className={styles.card}>
             <Link href={`/races/${r.id}`} className={styles.cardMain}>
-              <div className={styles.preview}>
-                <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
-              </div>
+              {r.coverUrl ? (
+                <div className={styles.coverWrap}>
+                  {/* Covers come from Blob or /api/files, so a plain img avoids image optimizer host config. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={r.coverUrl} alt="" className={styles.cover} loading="lazy" decoding="async" />
+                  <span className={styles.routeInset} aria-hidden="true">
+                    <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
+                  </span>
+                </div>
+              ) : (
+                <div className={styles.preview}>
+                  <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
+                </div>
+              )}
               <div className={styles.cardBody}>
                 <p className={styles.date}>{r.dateLabel}</p>
                 <h2 className={styles.cardTitle}>{r.event}</h2>

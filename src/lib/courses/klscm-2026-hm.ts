@@ -14,6 +14,7 @@ export const klscm2026Hm = {
   event: "Standard Chartered KL Marathon 2026",
   category: "ASICS Half Marathon",
   dateLabel: "Sunday 4 October 2026",
+  date: "2026-10-04",
   location: "Kuala Lumpur, Malaysia",
   officialUrl: "https://www.kl-marathon.com",
   files: [

@@ -27,6 +27,8 @@ export interface RaceMeta {
   event: string;
   category: string;
   dateLabel: string;
+  /** Race day, "YYYY-MM-DD", used to sort the overview. */
+  date?: string;
   location: string;
   officialUrl: string;
   files: RaceFile[];
