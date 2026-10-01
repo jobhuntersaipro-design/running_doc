@@ -170,8 +170,9 @@ function applyStyle(map: MapLibreMap, style: MapStyle) {
 function fit(map: MapLibreMap, plan: Plan, style: MapStyle, noticeShown: boolean) {
   const bounds = new LngLatBounds();
   plan.track.forEach((t) => bounds.extend([t.lon, t.lat]));
-  // Leave room under the tile notice so it never covers part of the course.
-  const padding = { top: noticeShown ? 88 : 32, right: 32, bottom: 32, left: 32 };
+  // Leave room for the live readout (top right) and the tile notice (bottom) so neither hides the course.
+  const wide = map.getContainer().clientWidth > 520;
+  const padding = { top: wide ? 32 : 112, right: wide ? 170 : 32, bottom: noticeShown ? 96 : 32, left: 32 };
   map.fitBounds(bounds, { padding, animate: false, pitch: 0, bearing: 0 });
   // Tilting after the fit keeps the whole course on screen; the near edge grows as the view tilts.
   if (style === "terrain") map.jumpTo({ pitch: 40, zoom: map.getZoom() - 0.35 });
@@ -225,7 +226,10 @@ export default function RouteMap({
   zones,
   colorBy,
   activeEvents,
+  hud,
 }: {
+  /** Live readout in the top right corner of the map. */
+  hud: { label: string; value: string; detail: string; zone?: number }[];
   zones: CourseZones;
   colorBy: ColorBy;
   /** Events the rehearsal is showing now; the first gets an animated pin on the map. */
@@ -415,6 +419,17 @@ export default function RouteMap({
     <div className={styles.mapFrame}>
       <div className={styles.mapBox}>
         <div ref={container} className={styles.map} role="img" aria-label="Course map with the runner's position" />
+        <dl className={styles.mapHud} aria-label="Live readout">
+          {hud.map((h) => (
+            <div key={h.label}>
+              <dt>{h.label}</dt>
+              <dd className={styles.num}>
+                {h.value}{" "}
+                <span className={h.zone ? `${styles.hudZone} ${styles[`zone${h.zone}`]}` : styles.hudDetail}>{h.detail}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
         {activeEvents.length ? createPortal(<EventIcon type={activeEvents[0].type} pin />, eventEl) : null}
         {failed ? (
           <p className={styles.mapNotice} role="status">

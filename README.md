@@ -13,7 +13,15 @@ A planner for beginner marathon and half marathon runners. Give it a course GPX 
 - **Hills**: each uphill's start and top elevation, gradient, steepest stretch, target pace and the treadmill incline to practise it.
 - **Maps**: streets (OpenFreeMap, no API key), satellite (Esri) or 3D terrain (AWS Terrain Tiles), plus a camera that follows the runner. The route is coloured by uphill, downhill and flat, and a popup describes each event when playback pauses on it.
 
-The example course is the 2026 KL Marathon half marathon. Its aid station distances were read from the route map, so they are estimates.
+The home page lists the races as cards (date, distance, uphill, official website, the course files and a route preview). Open a card for its plan at `/races/<id>`, or choose **Plan another race** (`/races/custom`) to upload any GPX.
+
+The first race is the 2026 KL Marathon half marathon. Its aid station distances were read from the route map, so they are estimates.
+
+### Adding a race
+
+1. Put its files in `public/races/<id>/` (`course.gpx`, plus any route map PDF).
+2. Add a config like `src/lib/courses/klscm-2026-hm.ts` (event, date, location, official link, files, distance, start time, aid stations).
+3. Add it to `RACES` in `src/lib/courses/index.ts`. The overview card and the race page are generated at build time.
 
 ## Run it
 

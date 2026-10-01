@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
+import { ExternalLink, FileDown } from "lucide-react";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { Input } from "@/components/arc/input/input";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
-import { ThemeSwitch, type Theme } from "@/components/arc/theme-switch/theme-switch";
+import { SiteHeader } from "@/components/site/site-header";
+import { useTheme } from "@/components/site/theme";
 import { TimePicker } from "@/components/arc/time-picker/time-picker";
-import type { CourseInput } from "@/lib/courses/types";
+import type { CourseInput, RaceMeta } from "@/lib/courses/types";
 import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
 import { CourseSetup } from "./course-setup";
 import { FinishBenchmarks } from "./finish-benchmarks";
@@ -51,25 +53,20 @@ function goalError(text: string, km: number): string | null {
   return null;
 }
 
-// The inline script in the layout sets data-theme before paint; follow it from there.
-const readTheme = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-function subscribeTheme(onChange: () => void) {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => observer.disconnect();
-}
+/** A race from the overview: the course plus its event details. */
+export type PlannerRace = CourseInput & Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files">;
 
-export function Planner({ example }: { example: CourseInput }) {
-  const [source, setSource] = useState<"example" | "upload">("example");
+/** The plan for one race, or for an uploaded GPX when `race` is null. */
+export function Planner({ race }: { race: PlannerRace | null }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   const [goalText, setGoalText] = useState("1:59:00");
   const [goalSeconds, setGoalSeconds] = useState(parseDuration("1:59:00"));
-  const [startTime, setStartTime] = useState(example.startTime ?? "06:00");
-  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light" as Theme);
+  const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
+  const theme = useTheme();
   const [tab, setTab] = useState("splits");
   const [zoneSettings, setZoneSettings] = useZoneSettings();
 
-  const course = source === "example" ? example : uploaded;
+  const course: CourseInput | null = race ?? uploaded;
   const km = course?.officialKm ?? 21.0975;
   const error = goalError(goalText, km);
 
@@ -105,23 +102,6 @@ export function Planner({ example }: { example: CourseInput }) {
     setGoalSeconds(parseDuration(text));
   }
 
-  function changeSource(value: string) {
-    const next = value === "upload" ? "upload" : "example";
-    setSource(next);
-    const distance = next === "example" ? example.officialKm : uploaded?.officialKm;
-    if (distance && goalError(goalText, distance)) changeGoalFor(distance);
-    if (next === "example") setStartTime(example.startTime ?? startTime);
-  }
-
-  function changeTheme(next: Theme) {
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // Storage can be blocked; the theme still applies for this visit.
-    }
-  }
-
   const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
   const summary = plan?.summary;
   const gels = plan?.events.filter((e) => e.type === "gel") ?? [];
@@ -132,38 +112,40 @@ export function Planner({ example }: { example: CourseInput }) {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.titleBlock}>
-          <h1 className={styles.title}>Race plan</h1>
-          <p className={styles.lede}>
-            Pace, fuel, hills and watch setup for your race, built from the course itself.
-          </p>
-        </div>
-        <ThemeSwitch theme={theme} onThemeChange={changeTheme} iconOnly label="Switch theme" />
-      </header>
+      <SiteHeader />
 
-      <section className={styles.section} aria-labelledby="course-heading">
-        <div className={styles.sectionHead}>
-          <h2 id="course-heading" className={styles.h2}>Course</h2>
-          <SegmentedControl
-            label="Course source"
-            value={source}
-            onValueChange={changeSource}
-            options={[
-              { value: "example", label: "Example course" },
-              { value: "upload", label: "Your GPX" },
-            ]}
-          />
-        </div>
-        {source === "example" ? (
-          <p className={styles.muted}>
-            {example.name}, {example.officialKm.toFixed(1)} km. Upload your own GPX to plan your race.
+      <section className={styles.section} aria-labelledby="race-heading">
+        <Breadcrumb items={[{ label: "Races", href: "/" }, { label: race ? race.name : "Your race" }]} />
+        <div className={styles.titleBlock}>
+          <h1 id="race-heading" className={styles.title}>
+            {race ? race.event : "Plan your own race"}
+          </h1>
+          <p className={styles.lede}>
+            {race
+              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.`
+              : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
-        ) : null}
-        {/* Kept mounted so the uploaded file and stations survive switching back and forth. */}
-        <div hidden={source !== "upload"}>
-          <CourseSetup course={uploaded} onCourseChange={changeCourse} />
         </div>
+        {race ? (
+          <ul className={styles.raceLinks}>
+            <li>
+              <a href={race.officialUrl} target="_blank" rel="noreferrer" className={styles.raceLink}>
+                <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />
+                Official race website
+              </a>
+            </li>
+            {race.files.map((f) => (
+              <li key={f.href}>
+                <a href={f.href} download className={styles.raceLink}>
+                  <FileDown size={16} strokeWidth={1.75} aria-hidden="true" />
+                  {f.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <CourseSetup course={uploaded} onCourseChange={changeCourse} />
+        )}
       </section>
 
       {course && plan && summary && zones ? (
