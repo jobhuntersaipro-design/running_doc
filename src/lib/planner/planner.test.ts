@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { klscm2026Hm as course } from "../courses/klscm-2026-hm";
-import { buildPlan, buildProfile, buildSegments, formatClock, formatPace, gradeMultiplier, parseDuration, parseGpx } from "./index";
+import { buildPlan, buildProfile, buildSegments, formatClock, formatPace, gradeMultiplier, parseDuration, parseGpx, treadmillIncline } from "./index";
 
 /** A straight north-south track, one point roughly every 100 m. */
 function syntheticGpx(km: number, ele: (km: number) => number): string {
@@ -55,12 +55,12 @@ describe("profile and segments", () => {
       20 + (km < 3 ? 0 : km < 4 ? (km - 3) * 60 : 60) + (Math.round(km * 10) % 2 ? 1 : 0);
     const profile = buildProfile(parseGpx(syntheticGpx(8, ele)), 8);
     const segments = buildSegments(profile);
-    const climbs = segments.filter((s) => s.kind === "climb");
+    const climbs = segments.filter((s) => s.kind === "uphill");
     expect(climbs).toHaveLength(1);
     expect(climbs[0].startKm).toBeGreaterThan(2.3);
     expect(climbs[0].endKm).toBeLessThan(4.7);
     expect(climbs[0].gain).toBeGreaterThan(45);
-    expect(segments.filter((s) => s.kind === "descent")).toHaveLength(0);
+    expect(segments.filter((s) => s.kind === "downhill")).toHaveLength(0);
   });
 });
 
@@ -114,7 +114,7 @@ describe("KLSCM 2026 half marathon", () => {
   });
 
   it("detects the two big climbs", () => {
-    const climbs = plan.segments.filter((s) => s.kind === "climb" && s.gain >= 30);
+    const climbs = plan.segments.filter((s) => s.kind === "uphill" && s.gain >= 30);
     expect(climbs.some((c) => c.startKm < 3 && c.endKm > 4)).toBe(true);
     expect(climbs.some((c) => c.startKm > 7 && c.endKm < 9.5)).toBe(true);
   });
@@ -129,7 +129,7 @@ describe("KLSCM 2026 half marathon", () => {
     const gels = plan.events.filter((e) => e.type === "gel");
     expect(gels).toHaveLength(2);
     for (const g of gels) {
-      const onClimb = plan.segments.some((s) => s.kind === "climb" && g.km > s.startKm && g.km < s.endKm);
+      const onClimb = plan.segments.some((s) => s.kind === "uphill" && g.km > s.startKm && g.km < s.endKm);
       expect(onClimb).toBe(false);
       expect(plan.events.some((e) => e.type === "drink" && e.km > g.km && e.km - g.km < 1)).toBe(true);
     }
@@ -153,6 +153,35 @@ describe("KLSCM 2026 half marathon", () => {
     const slower = make("2:30:00");
     expect(slower.splits[21].cumulativeSeconds).toBeCloseTo(9000, 3);
     expect(slower.splits[10].paceSecPerKm).toBeGreaterThan(plan.splits[10].paceSecPerKm);
+  });
+});
+
+describe("hills", () => {
+  it("adds 1% to the road grade for the treadmill, in 0.5% steps", () => {
+    expect(treadmillIncline(0)).toBe(1);
+    expect(treadmillIncline(2.1)).toBe(3);
+    expect(treadmillIncline(3.2)).toBe(4);
+    expect(treadmillIncline(-2)).toBe(1);
+  });
+
+  it("describes each uphill from its start to its summit", () => {
+    const plan = buildPlan({
+      name: "one hill",
+      // flat 0-3 km, 5% up 3-4 km, then flat to 8 km
+      gpx: syntheticGpx(8, (km) => 20 + (km < 3 ? 0 : km < 4 ? (km - 3) * 50 : 50)),
+      officialKm: 8,
+      goalSeconds: 2700,
+      stations: [],
+    });
+    const up = plan.hills.filter((h) => h.kind === "uphill");
+    expect(up).toHaveLength(1);
+    expect(up[0].change).toBeGreaterThan(40);
+    expect(up[0].avgGrade).toBeGreaterThan(3.5);
+    expect(up[0].treadmillIncline).toBeGreaterThanOrEqual(4.5);
+    expect(up[0].paceSecPerKm).toBeGreaterThan(plan.summary.goalPaceSecPerKm);
+    const event = plan.events.find((e) => e.type === "uphill");
+    expect(event?.hill).toEqual(up[0]);
+    expect(event?.title).toMatch(/^Uphill, \+\d+ m over/);
   });
 });
 

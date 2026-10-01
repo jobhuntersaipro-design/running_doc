@@ -6,7 +6,7 @@ import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
 const HEIGHT = 200;
-const PAD = { left: 40, right: 12, top: 12, bottom: 48 };
+const PAD = { left: 40, right: 12, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
 
 export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; onScrub: (km: number) => void }) {
@@ -77,7 +77,7 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
       <figcaption className={styles.chartHead}>
         <span className={styles.h3}>Elevation and hills</span>
         <ul className={styles.legend} aria-label="Chart legend">
-          <li><span className={styles.swatchClimb} aria-hidden="true" />Climb</li>
+          <li><span className={styles.swatchClimb} aria-hidden="true" />Uphill</li>
           <li><span className={styles.swatchDescent} aria-hidden="true" />Downhill</li>
           <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
           <li><span className={styles.swatchRing} aria-hidden="true" />Drink</li>
@@ -118,8 +118,15 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
               <path
                 key={`${s.kind}-${s.startKm}`}
                 d={pathFor(s.startKm, s.endKm)}
-                className={s.kind === "climb" ? styles.climbLine : styles.descentLine}
+                className={s.kind === "uphill" ? styles.climbLine : styles.descentLine}
               />
+            ))}
+          {plan.hills
+            .filter((h) => h.kind === "uphill")
+            .map((h) => (
+              <text key={`peak-${h.peakKm}`} x={x(h.peakKm)} y={y(h.peakEle) - 8} className={styles.peakLabel} textAnchor="middle">
+                {Math.round(h.peakEle)} m
+              </text>
             ))}
           {kmTicks.map((k) => (
             <text key={k} x={x(k)} y={HEIGHT - 6} className={styles.axisLabel} textAnchor={k === 0 ? "start" : "middle"}>

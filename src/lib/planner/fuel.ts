@@ -25,7 +25,7 @@ export const DEFAULT_FUEL: FuelOptions = {
 const DRINK_KINDS = ["water", "isotonic"] as const;
 
 function inClimb(segments: Segment[], km: number): boolean {
-  return segments.some((s) => s.kind === "climb" && km > s.startKm && km < s.endKm);
+  return segments.some((s) => s.kind === "uphill" && km > s.startKm && km < s.endKm);
 }
 
 function hasDrink(s: Station): boolean {

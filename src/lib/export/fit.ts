@@ -142,7 +142,7 @@ export function buildFitWorkout(plan: Plan, options: FitOptions = {}): Uint8Arra
   ];
   define(body, 2, 27, step);
   plan.splits.forEach((s, i) => {
-    const label = s.tag === "hold" && s.avgGrade >= 1.2 ? `Km ${s.km} hill` : `Km ${s.km}`;
+    const label = s.tag === "hold" && s.avgGrade >= 1.2 ? `Km ${s.km} uphill` : `Km ${s.km}`;
     data(body, 2, step, [
       i,
       label,

@@ -7,11 +7,11 @@ interface Run {
 }
 
 export interface SegmentOptions {
-  /** Gradient (percent) beyond which an interval counts as climb or descent. */
+  /** Gradient (percent) beyond which an interval counts as uphill or downhill. */
   gradeThreshold: number;
   /** Runs shorter than this are absorbed by a neighbour. */
   minLengthM: number;
-  /** Climbs/descents with less net elevation change than this become flat. */
+  /** Uphills and downhills with less net elevation change than this become flat. */
   minNetM: number;
 }
 
@@ -58,7 +58,7 @@ function absorbShort(profile: ProfileSample[], runs: Run[], minM: number): Run[]
   }
 }
 
-/** Splits the course into climbs, descents and flat sections. */
+/** Splits the course into uphills, downhills and flat sections. */
 export function buildSegments(
   profile: ProfileSample[],
   options: SegmentOptions = DEFAULT_SEGMENT_OPTIONS,
@@ -67,15 +67,15 @@ export function buildSegments(
   const labels: SegmentKind[] = [];
   for (let i = 0; i < n; i++) {
     const g = ((profile[i + 1].ele - profile[i].ele) / ((profile[i + 1].km - profile[i].km) * 1000)) * 100;
-    labels.push(g >= options.gradeThreshold ? "climb" : g <= -options.gradeThreshold ? "descent" : "flat");
+    labels.push(g >= options.gradeThreshold ? "uphill" : g <= -options.gradeThreshold ? "downhill" : "flat");
   }
   let runs: Run[] = labels.map((kind, i) => ({ kind, from: i, to: i + 1 }));
   runs = absorbShort(profile, runs, options.minLengthM);
 
   runs = runs.map((r) => {
     const net = profile[r.to].ele - profile[r.from].ele;
-    if (r.kind === "climb" && net < options.minNetM) return { ...r, kind: "flat" as const };
-    if (r.kind === "descent" && -net < options.minNetM) return { ...r, kind: "flat" as const };
+    if (r.kind === "uphill" && net < options.minNetM) return { ...r, kind: "flat" as const };
+    if (r.kind === "downhill" && -net < options.minNetM) return { ...r, kind: "flat" as const };
     return r;
   });
   runs = absorbShort(profile, runs, options.minLengthM);
@@ -90,6 +90,14 @@ export function buildSegments(
     }
     const startKm = profile[r.from].km;
     const endKm = profile[r.to].km;
+    // The summit of an uphill (or the bottom of a downhill) and its steepest stretch.
+    const up = r.kind !== "downhill";
+    let peak = r.from;
+    let steepest = 0;
+    for (let i = r.from; i <= r.to; i++) {
+      if (up ? profile[i].ele > profile[peak].ele : profile[i].ele < profile[peak].ele) peak = i;
+      if (up ? profile[i].grade > steepest : profile[i].grade < steepest) steepest = profile[i].grade;
+    }
     return {
       kind: r.kind,
       startKm,
@@ -100,6 +108,9 @@ export function buildSegments(
       gain,
       loss,
       avgGrade: ((profile[r.to].ele - profile[r.from].ele) / ((endKm - startKm) * 1000)) * 100,
+      peakKm: profile[peak].km,
+      peakEle: profile[peak].ele,
+      steepestGrade: steepest,
     };
   });
 }

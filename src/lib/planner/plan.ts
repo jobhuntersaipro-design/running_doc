@@ -1,11 +1,12 @@
 import { buildPaceBlocks } from "./blocks";
+import { hillInfo } from "./hills";
 import { buildFuelEvents, DEFAULT_FUEL, type FuelOptions } from "./fuel";
 import { formatPace } from "./format";
 import { parseGpx } from "./gpx";
 import { DEFAULT_PACING, buildTimeline, timeAt, type PacingOptions } from "./pacing";
 import { buildProfile, elevationAt, haversineM } from "./profile";
 import { buildSegments } from "./segments";
-import type { EffortTag, Plan, PlanEvent, Segment, Split, Station, TrackPoint, TrackSample } from "./types";
+import type { EffortTag, HillInfo, Plan, PlanEvent, Split, Station, TrackPoint, TrackSample } from "./types";
 
 export interface PlanInput {
   name: string;
@@ -18,30 +19,29 @@ export interface PlanInput {
   fuel?: FuelOptions;
 }
 
-function terrainEvents(segments: Segment[], paceOf: (s: Segment) => number, at: (km: number) => number): PlanEvent[] {
-  const events: PlanEvent[] = [];
-  for (const s of segments) {
-    const len = s.lengthKm.toFixed(1);
-    if (s.kind === "climb" && s.gain >= 10) {
-      events.push({
-        type: "climb",
-        km: round1(s.startKm),
-        elapsedSeconds: Math.round(at(s.startKm)),
-        title: `Climb, +${Math.round(s.gain)} m over ${len} km`,
-        detail: `Keep the effort steady and let your pace drop to about ${formatPace(paceOf(s))}/km. Shorten your stride and do not chase the goal pace uphill.`,
-      });
-    }
-    if (s.kind === "descent" && s.loss >= 10) {
-      events.push({
-        type: "descent",
-        km: round1(s.startKm),
-        elapsedSeconds: Math.round(at(s.startKm)),
-        title: `Downhill, -${Math.round(s.loss)} m over ${len} km`,
-        detail: `Stay relaxed and avoid braking hard. About ${formatPace(paceOf(s))}/km is fine, so use it to recover rather than to bank time.`,
-      });
-    }
-  }
-  return events;
+function terrainEvents(hills: HillInfo[], at: (km: number) => number): PlanEvent[] {
+  return hills.map((h) => {
+    const len = h.lengthKm.toFixed(1);
+    const pace = formatPace(h.paceSecPerKm);
+    const elevation = `${Math.round(h.startEle)} m to ${Math.round(h.peakEle)} m`;
+    return h.kind === "uphill"
+      ? {
+          type: "uphill",
+          km: round1(h.startKm),
+          elapsedSeconds: Math.round(at(h.startKm)),
+          title: `Uphill, +${Math.round(h.change)} m over ${len} km`,
+          detail: `Rises from ${elevation}. Keep the effort steady and let your pace drop to about ${pace}/km. Shorten your stride and do not chase the goal pace uphill.`,
+          hill: h,
+        }
+      : {
+          type: "downhill",
+          km: round1(h.startKm),
+          elapsedSeconds: Math.round(at(h.startKm)),
+          title: `Downhill, -${Math.round(h.change)} m over ${len} km`,
+          detail: `Drops from ${elevation}. Stay relaxed and avoid braking hard. About ${pace}/km is fine, so use it to recover rather than to bank time.`,
+          hill: h,
+        };
+  });
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -76,7 +76,8 @@ export function buildPlan(input: PlanInput): Plan {
   const totalKm = input.officialKm;
   const goalPace = input.goalSeconds / totalKm;
 
-  const paceOf = (s: Segment) => (at(s.endKm) - at(s.startKm)) / s.lengthKm;
+  const paceBetween = (from: number, to: number) => (at(to) - at(from)) / (to - from);
+  const hills = segments.map((s) => hillInfo(s, profile, paceBetween)).filter((h): h is HillInfo => h !== null);
 
   const events: PlanEvent[] = ([
     {
@@ -86,7 +87,7 @@ export function buildPlan(input: PlanInput): Plan {
       title: "Start easy",
       detail: `The first 2 km are planned a little slower than ${formatPace(goalPace)}/km. Crowds and adrenaline make it feel too easy, so hold back.`,
     },
-    ...terrainEvents(segments, paceOf, at),
+    ...terrainEvents(hills, at),
     ...buildFuelEvents(input.stations, segments, timeline, input.fuel ?? DEFAULT_FUEL),
     {
       type: "push",
@@ -122,7 +123,7 @@ export function buildPlan(input: PlanInput): Plan {
   }
 
   const biggestClimb =
-    segments.filter((s) => s.kind === "climb").sort((a, b) => b.gain - a.gain)[0] ?? null;
+    segments.filter((s) => s.kind === "uphill").sort((a, b) => b.gain - a.gain)[0] ?? null;
   const half = totalKm / 2;
 
   return {
@@ -134,6 +135,7 @@ export function buildPlan(input: PlanInput): Plan {
     segments,
     splits,
     events,
+    hills,
     summary: {
       goalSeconds: input.goalSeconds,
       goalPaceSecPerKm: goalPace,

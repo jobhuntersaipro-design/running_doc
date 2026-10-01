@@ -38,7 +38,7 @@ export function PaceBand({ plan, startTime }: { plan: Plan; startTime: string })
           <tbody>
             {plan.splits.map((s) => {
               const marks = [
-                ...(s.avgGrade >= 1.2 ? ["Hill"] : []),
+                ...(s.avgGrade >= 1.2 ? ["Uphill"] : []),
                 ...new Set(s.events.map((e) => MARK[e.type]).filter(Boolean)),
               ].join(", ");
               const isFinish = s.lengthKm < 1;

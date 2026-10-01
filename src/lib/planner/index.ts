@@ -7,3 +7,4 @@ export { buildTimeline, gradeMultiplier, kmAtTime, timeAt } from "./pacing";
 export { buildPaceBlocks } from "./blocks";
 export { elevationAt, haversineM } from "./profile";
 export { buildPlan, type PlanInput } from "./plan";
+export { hillInfo, treadmillIncline, MIN_HILL_M } from "./hills";

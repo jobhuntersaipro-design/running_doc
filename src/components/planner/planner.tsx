@@ -12,6 +12,7 @@ import type { CourseInput } from "@/lib/courses/types";
 import { buildPlan, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
 import { CourseSetup } from "./course-setup";
 import { FuelPlan } from "./fuel-plan";
+import { HillsTable } from "./hills-table";
 import { PaceBand } from "./pace-band";
 import { RaceRehearsal } from "./race-rehearsal";
 import { SplitsTable } from "./splits-table";
@@ -119,6 +120,7 @@ export function Planner({ example }: { example: CourseInput }) {
   const summary = plan?.summary;
   const gels = plan?.events.filter((e) => e.type === "gel") ?? [];
   const drinks = plan?.events.filter((e) => e.type === "drink") ?? [];
+  const biggestUphill = plan?.hills.filter((h) => h.kind === "uphill").sort((a, b) => b.change - a.change)[0];
   const cutoff = course?.cutoff;
   const cutoffArrival = plan && cutoff ? clockAt(startTime, timeAt(plan.timeline, cutoff.km)) : null;
 
@@ -192,13 +194,13 @@ export function Planner({ example }: { example: CourseInput }) {
 
           <section className={styles.kpis} aria-label="Plan at a glance">
             <MetricCard
-              label="Total climb"
+              label="Total uphill"
               value={Math.round(summary.totalGain)}
               suffix=" m"
               context={
-                summary.biggestClimb
-                  ? `Biggest is +${Math.round(summary.biggestClimb.gain)} m from km ${summary.biggestClimb.startKm.toFixed(1)}`
-                  : "No real climbs on this course"
+                biggestUphill
+                  ? `Biggest is +${Math.round(biggestUphill.change)} m from km ${biggestUphill.startKm.toFixed(1)}`
+                  : "No real uphills on this course"
               }
             />
             <MetricCard
@@ -218,12 +220,16 @@ export function Planner({ example }: { example: CourseInput }) {
           <Tabs value={tab} onValueChange={setTab} className={styles.tabs}>
             <TabsList aria-label="Plan details">
               <TabsTrigger value="splits">Splits</TabsTrigger>
+              <TabsTrigger value="hills">Hills</TabsTrigger>
               <TabsTrigger value="fuel">Fuel and water</TabsTrigger>
               <TabsTrigger value="watch">Watch setup</TabsTrigger>
               <TabsTrigger value="band">Pace band</TabsTrigger>
             </TabsList>
             <TabsContent value="splits">
               <SplitsTable plan={plan} startTime={startTime} />
+            </TabsContent>
+            <TabsContent value="hills">
+              <HillsTable plan={plan} />
             </TabsContent>
             <TabsContent value="fuel">
               <FuelPlan plan={plan} startTime={startTime} approximate={!!course.stationsApproximate} />

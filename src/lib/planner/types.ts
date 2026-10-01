@@ -22,7 +22,7 @@ export interface ProfileSample {
   grade: number;
 }
 
-export type SegmentKind = "climb" | "descent" | "flat";
+export type SegmentKind = "uphill" | "downhill" | "flat";
 
 export interface Segment {
   kind: SegmentKind;
@@ -36,6 +36,32 @@ export interface Segment {
   /** Total descent inside the segment, metres (positive number). */
   loss: number;
   avgGrade: number;
+  /** Highest point of an uphill, lowest point of a downhill (the start point for flats). */
+  peakKm: number;
+  peakEle: number;
+  /** Steepest smoothed gradient inside the segment, percent (negative for downhills). */
+  steepestGrade: number;
+}
+
+/** What a runner needs to know about one uphill or downhill. */
+export interface HillInfo {
+  kind: "uphill" | "downhill";
+  startKm: number;
+  endKm: number;
+  lengthKm: number;
+  startEle: number;
+  /** Top of an uphill, bottom of a downhill. */
+  peakEle: number;
+  peakKm: number;
+  /** Metres gained (uphill) or lost (downhill) from the start to the peak. */
+  change: number;
+  /** Typical gradient over the main part of the hill, percent. */
+  avgGrade: number;
+  steepestGrade: number;
+  /** Planned pace over the whole segment. */
+  paceSecPerKm: number;
+  /** Treadmill incline (percent) to practise this uphill indoors; null for downhills. */
+  treadmillIncline: number | null;
 }
 
 export type StationKind =
@@ -62,8 +88,8 @@ export type EventType =
   | "drink"
   | "cool"
   | "banana"
-  | "climb"
-  | "descent"
+  | "uphill"
+  | "downhill"
   | "push";
 
 export interface PlanEvent {
@@ -72,6 +98,7 @@ export interface PlanEvent {
   elapsedSeconds: number;
   title: string;
   detail: string;
+  hill?: HillInfo;
 }
 
 export interface Split {
@@ -127,5 +154,6 @@ export interface Plan {
   segments: Segment[];
   splits: Split[];
   events: PlanEvent[];
+  hills: HillInfo[];
   summary: PlanSummary;
 }

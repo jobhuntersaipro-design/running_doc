@@ -9,9 +9,11 @@ import { Button } from "@/components/arc/button/button";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { Progress } from "@/components/arc/progress/progress";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { formatClock, formatPace, kmAtTime, timeAt, type Plan, type PlanEvent } from "@/lib/planner";
+import { formatClock, formatPace, kmAtTime, timeAt, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
+import type { MapStyle } from "./route-map";
 import { TAG_LABEL, clockAt, paceAt } from "./util";
 import styles from "./planner.module.css";
 
@@ -26,16 +28,25 @@ const PLAYBACK = [
   { value: "180", label: "3 min" },
 ];
 
-/** How long (km) an event stays on screen after the runner passes it. */
-const CALLOUT_KM = 0.5;
+const MAP_STYLES: { value: MapStyle; label: string }[] = [
+  { value: "streets", label: "Streets" },
+  { value: "satellite", label: "Satellite" },
+  { value: "terrain", label: "Terrain" },
+];
 
-const eventKey = (e: PlanEvent) => `${e.type}-${e.km}`;
+/** How long (km) an event stays on screen after the runner passes it, when not paused on it. */
+const CALLOUT_KM = 0.5;
+const EPS = 1e-6;
 
 export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTime: string; theme: Theme }) {
   const total = plan.summary.totalKm;
   const [km, setKm] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [length, setLength] = useState("60");
+  const [pauseAtEvents, setPauseAtEvents] = useState(true);
+  const [stoppedAt, setStoppedAt] = useState<number | null>(null);
+  const [mapStyle, setMapStyle] = useState<MapStyle>("streets");
+  const [follow, setFollow] = useState(false);
   const kmRef = useRef(0);
   const reduce = useReducedMotion();
 
@@ -49,44 +60,63 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
     const rate = goal / Number(length);
     let last = performance.now();
     let frame = requestAnimationFrame(function tick(now) {
-      const dt = Math.min(0.1, (now - last) / 1000);
+      // The first frame's timestamp can be a hair before `last`; never step backwards,
+      // or the runner would cross the event it just stopped at a second time.
+      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
-      const t = timeAt(plan.timeline, kmRef.current) + dt * rate;
-      if (t >= goal) {
-        kmRef.current = total;
-        setKm(total);
+      const from = kmRef.current;
+      const t = timeAt(plan.timeline, from) + dt * rate;
+      const to = t >= goal ? total : Math.max(from, kmAtTime(plan.timeline, t));
+      // Stop exactly on the first event this frame would run past.
+      const hit = pauseAtEvents ? plan.events.find((e) => e.type !== "start" && e.km > from + EPS && e.km <= to + EPS) : undefined;
+      if (hit) {
+        kmRef.current = hit.km;
+        setKm(hit.km);
+        setStoppedAt(hit.km);
         setPlaying(false);
         return;
       }
-      kmRef.current = kmAtTime(plan.timeline, t);
-      setKm(kmRef.current);
+      kmRef.current = to;
+      setKm(to);
+      if (to >= total) {
+        setPlaying(false);
+        return;
+      }
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing, length, plan, total]);
+  }, [playing, length, plan, total, pauseAtEvents]);
 
   const position = Math.min(km, total);
   const elapsed = timeAt(plan.timeline, position);
   const split = plan.splits[Math.min(Math.floor(position), plan.splits.length - 1)];
-  const finished = position >= total - 1e-6;
-  const upcoming = plan.events.find((e) => e.km > position + 1e-6);
-  const active = [...plan.events]
-    .reverse()
-    .find((e) => e.km <= position + 1e-6 && position - e.km < CALLOUT_KM && (position > 0 || e.type === "start"));
+  const finished = position >= total - EPS;
+  const upcoming = plan.events.find((e) => e.km > position + EPS);
+
+  // Events at the same spot (a station with a splash zone, say) show together.
+  const anchor =
+    stoppedAt ??
+    [...plan.events].reverse().find((e) => e.km <= position + EPS && position - e.km < CALLOUT_KM && (position > 0 || e.type === "start"))?.km ??
+    null;
+  const group = anchor === null ? [] : plan.events.filter((e) => Math.abs(e.km - anchor) < EPS);
 
   function togglePlay() {
     if (finished) {
       kmRef.current = 0;
       setKm(0);
     }
+    setStoppedAt(null);
     setPlaying((p) => !p || finished);
   }
 
   function scrub(next: number) {
     setPlaying(false);
+    setStoppedAt(null);
     kmRef.current = next;
     setKm(next);
   }
+
+  const playLabel = playing ? "Pause" : finished ? "Replay race" : stoppedAt !== null ? "Continue" : position > 0 ? "Resume" : "Play race";
 
   return (
     <section className={styles.rehearsal} aria-labelledby="rehearsal-heading">
@@ -95,12 +125,20 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
         <SegmentedControl label="Playback length" value={length} onValueChange={setLength} options={PLAYBACK} />
       </div>
 
+      <div className={styles.toolbar}>
+        <SegmentedControl label="Map style" value={mapStyle} onValueChange={(v) => setMapStyle(v as MapStyle)} options={MAP_STYLES} />
+        <div className={styles.switches}>
+          <Switch label="Pause at each event" checked={pauseAtEvents} onCheckedChange={setPauseAtEvents} />
+          <Switch label="Follow runner in 3D" checked={follow} onCheckedChange={setFollow} />
+        </div>
+      </div>
+
       <div className={styles.rehearsalGrid}>
         <div className={styles.mapWrap}>
-          <RouteMap plan={plan} km={position} theme={theme} />
+          <RouteMap plan={plan} km={position} theme={theme} mapStyle={mapStyle} follow={follow} />
         </div>
 
-        <div className={styles.nowPanel} aria-live="off">
+        <div className={styles.nowPanel}>
           <dl className={styles.nowStats}>
             <div>
               <dt>Distance</dt>
@@ -131,17 +169,18 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
 
           <div className={styles.callout} aria-live="polite">
             <AnimatePresence mode="popLayout" initial={false}>
-              {active ? (
+              {group.length ? (
                 <motion.div
-                  key={eventKey(active)}
-                  className={styles.calloutCard}
+                  key={`group-${anchor}`}
+                  className={styles.calloutStack}
                   initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, transition: { duration: motionTokens.duration.exit } }}
                   transition={reduce ? { duration: motionTokens.duration.instant } : motionTokens.spring.smooth}
                 >
-                  <p className={styles.calloutTitle}>{active.title}</p>
-                  <p className={styles.calloutDetail}>{active.detail}</p>
+                  {group.map((e) => (
+                    <EventCard key={`${e.type}-${e.km}`} event={e} />
+                  ))}
                 </motion.div>
               ) : (
                 <motion.p
@@ -172,7 +211,7 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
           ) : (
             <Play size={16} strokeWidth={1.75} aria-hidden="true" />
           )}
-          {playing ? "Pause" : finished ? "Replay race" : position > 0 ? "Resume" : "Play race"}
+          {playLabel}
         </Button>
         <Button variant="ghost" onClick={() => scrub(0)} disabled={position === 0}>
           Back to start
@@ -182,5 +221,43 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
 
       <ElevationChart plan={plan} km={position} onScrub={scrub} />
     </section>
+  );
+}
+
+function EventCard({ event }: { event: PlanEvent }) {
+  return (
+    <div className={styles.calloutCard}>
+      <p className={styles.calloutTitle}>{event.title}</p>
+      <p className={styles.calloutDetail}>{event.detail}</p>
+      {event.hill ? <HillStats hill={event.hill} /> : null}
+    </div>
+  );
+}
+
+export function HillStats({ hill }: { hill: HillInfo }) {
+  const up = hill.kind === "uphill";
+  return (
+    <dl className={styles.hillStats}>
+      <div>
+        <dt>Elevation</dt>
+        <dd className={styles.num}>
+          {Math.round(hill.startEle)} to {Math.round(hill.peakEle)} m
+        </dd>
+      </div>
+      <div>
+        <dt>Gradient</dt>
+        <dd className={styles.num}>
+          {Math.abs(hill.avgGrade).toFixed(1)}%, steepest {Math.abs(hill.steepestGrade).toFixed(1)}%
+        </dd>
+      </div>
+      <div>
+        <dt>Target pace</dt>
+        <dd className={styles.num}>{formatPace(hill.paceSecPerKm)}/km</dd>
+      </div>
+      <div>
+        <dt>Treadmill</dt>
+        <dd className={styles.num}>{up && hill.treadmillIncline !== null ? `${hill.treadmillIncline}% incline` : "Practise outdoors"}</dd>
+      </div>
+    </dl>
   );
 }
