@@ -135,7 +135,14 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
 
       <div className={styles.rehearsalGrid}>
         <div className={styles.mapWrap}>
-          <RouteMap plan={plan} km={position} theme={theme} mapStyle={mapStyle} follow={follow} />
+          <RouteMap
+            plan={plan}
+            km={position}
+            theme={theme}
+            mapStyle={mapStyle}
+            follow={follow}
+            popupEvents={stoppedAt !== null ? group : []}
+          />
         </div>
 
         <div className={styles.nowPanel}>
