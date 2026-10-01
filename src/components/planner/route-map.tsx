@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { LngLatBounds, Map as MapLibreMap, Marker, Popup, setWorkerUrl, type ExpressionSpecification, type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { formatPace, type Plan, type PlanEvent } from "@/lib/planner";
+import { ZONES, averageHr, formatPace, paceZoneFor, type CourseZones, type Plan, type PlanEvent } from "@/lib/planner";
 import { pointAt } from "./util";
+import { RouteLegend } from "./route-legend";
+import { ZONE_MIX, type ColorBy } from "./zone-style";
 import styles from "./planner.module.css";
 
 export type MapStyle = "streets" | "satellite" | "terrain";
@@ -46,18 +48,43 @@ function slice(plan: Plan, fromKm: number, toKm: number): [number, number][] {
   return coords;
 }
 
-/** The course as one line per uphill, downhill and flat section, cut off at `untilKm`. */
-function routeSegments(plan: Plan, untilKm = Infinity): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+interface ColorRun {
+  startKm: number;
+  endKm: number;
+  /** "uphill", "downhill", "flat", or "z1" to "z5". */
+  key: string;
+}
+
+function colorRuns(plan: Plan, zones: CourseZones, colorBy: ColorBy): ColorRun[] {
+  if (colorBy === "hills") return plan.segments.map((s) => ({ startKm: s.startKm, endKm: s.endKm, key: s.kind }));
+  const runs = colorBy === "pace" ? zones.paceRuns : zones.hrRuns;
+  return runs.map((r) => ({ startKm: r.startKm, endKm: r.endKm, key: `z${r.zone}` }));
+}
+
+/** The course as one coloured line per run, cut off at `untilKm`. */
+function routeLines(plan: Plan, runs: ColorRun[], untilKm = Infinity): GeoJSON.FeatureCollection<GeoJSON.LineString> {
   return {
     type: "FeatureCollection",
-    features: plan.segments
-      .filter((s) => s.startKm < untilKm)
-      .map((s) => ({
+    features: runs
+      .filter((r) => r.startKm < untilKm)
+      .map((r) => ({
         type: "Feature",
-        properties: { kind: s.kind },
-        geometry: { type: "LineString", coordinates: slice(plan, s.startKm, Math.min(s.endKm, untilKm)) },
+        properties: { key: r.key },
+        geometry: { type: "LineString", coordinates: slice(plan, r.startKm, Math.min(r.endKm, untilKm)) },
       })),
   };
+}
+
+function rgba(color: string): number[] {
+  return (color.match(/[\d.]+/g) ?? ["0", "0", "0", "1"]).map(Number);
+}
+
+/** Mixes two resolved colours in sRGB; good enough for map lines. */
+function mix(a: string, b: string, weightA: number): string {
+  const [r1, g1, b1] = rgba(a);
+  const [r2, g2, b2] = rgba(b);
+  const m = (x: number, y: number) => Math.round(x * weightA + y * (1 - weightA));
+  return `rgb(${m(r1, r2)}, ${m(g1, g2)}, ${m(b1, b2)})`;
 }
 
 function stops(plan: Plan): GeoJSON.FeatureCollection<GeoJSON.Point> {
@@ -83,7 +110,7 @@ function bearingBetween([lon1, lat1]: [number, number], [lon2, lat2]: [number, n
 }
 
 /** Adds our sources and layers on top of whichever basemap style is loaded. */
-function addOverlay(map: MapLibreMap, plan: Plan, km: number) {
+function addOverlay(map: MapLibreMap, plan: Plan, runs: ColorRun[], km: number) {
   map.addSource("satellite", {
     type: "raster",
     tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
@@ -93,8 +120,8 @@ function addOverlay(map: MapLibreMap, plan: Plan, km: number) {
   });
   map.addSource("dem-hillshade", { type: "raster-dem", tiles: DEM_TILES, encoding: "terrarium", tileSize: 256, maxzoom: 14, attribution: "Elevation © Mapzen, AWS Terrain Tiles" });
   map.addSource("dem-terrain", { type: "raster-dem", tiles: DEM_TILES, encoding: "terrarium", tileSize: 256, maxzoom: 14 });
-  map.addSource("route", { type: "geojson", data: routeSegments(plan) });
-  map.addSource("done", { type: "geojson", data: routeSegments(plan, km) });
+  map.addSource("route", { type: "geojson", data: routeLines(plan, runs) });
+  map.addSource("done", { type: "geojson", data: routeLines(plan, runs, km) });
   map.addSource("stops", { type: "geojson", data: stops(plan) });
 
   const lineLayout = { "line-join": "round", "line-cap": "round" } as const;
@@ -113,8 +140,20 @@ function applyStyle(map: MapLibreMap, style: MapStyle) {
   map.setTerrain(style === "terrain" ? { source: "dem-terrain", exaggeration: 1.3 } : null);
 
   const surface = token("--surface", "#fff");
-  // Same colours as the elevation chart: uphill, downhill, and a neutral for flat ground.
-  const byKind: ExpressionSpecification = ["match", ["get", "kind"], "uphill", token("--series-3", "#e58f00"), "downhill", token("--series-2", "#7128a5"), token("--text-secondary", "#666")];
+  // Same colours as the elevation chart: uphill, downhill, a neutral for flat ground, and the zone ramp.
+  const series = token("--series-3", "#e58f00");
+  const ink = token("--foreground", "#111");
+  const zoneStops = ZONES.flatMap((z) => [`z${z}`, mix(mix(series, surface, ZONE_MIX[z].series), ink, 1 - ZONE_MIX[z].ink)]);
+  const byKind: ExpressionSpecification = [
+    "match",
+    ["get", "key"],
+    "uphill",
+    series,
+    "downhill",
+    token("--series-2", "#7128a5"),
+    ...zoneStops,
+    token("--text-secondary", "#666"),
+  ];
   map.setPaintProperty("route-casing", "line-color", style === "satellite" ? "rgba(255, 255, 255, 0.9)" : surface);
   map.setPaintProperty("route-ahead", "line-color", byKind);
   map.setPaintProperty("route-done", "line-color", byKind);
@@ -137,7 +176,7 @@ function fit(map: MapLibreMap, plan: Plan, style: MapStyle, noticeShown: boolean
 }
 
 /** Popup content built from DOM nodes so event text is never parsed as HTML. */
-function popupContent(events: PlanEvent[]): HTMLElement {
+function popupContent(events: PlanEvent[], zones: CourseZones): HTMLElement {
   const root = document.createElement("div");
   root.className = styles.popupBody;
   for (const e of events) {
@@ -159,6 +198,9 @@ function popupContent(events: PlanEvent[]): HTMLElement {
         `${formatPace(h.paceSecPerKm)}/km`,
       ];
       if (h.treadmillIncline !== null) parts.push(`treadmill ${h.treadmillIncline}%`);
+      const hr = averageHr(zones, h.startKm, h.endKm);
+      const hrZone = zones.hrZones.find((z) => hr >= z.min && hr <= z.max)?.zone ?? 5;
+      parts.push(`pace Z${paceZoneFor(zones.thresholdPace, h.paceSecPerKm)}`, `about ${hr} bpm (Z${hrZone})`);
       facts.textContent = parts.join(", ");
       item.append(facts);
     }
@@ -174,7 +216,11 @@ export default function RouteMap({
   mapStyle,
   follow,
   popupEvents,
+  zones,
+  colorBy,
 }: {
+  zones: CourseZones;
+  colorBy: ColorBy;
   plan: Plan;
   km: number;
   theme: Theme;
@@ -192,9 +238,10 @@ export default function RouteMap({
   // Bumps every time a style (basemap or fallback) finishes loading with our overlay on top.
   const [styleVersion, setStyleVersion] = useState(0);
   const [tiles, setTiles] = useState<Record<string, "ok" | "failed">>({});
-  const latest = useRef({ plan, km });
+  const runs = colorRuns(plan, zones, colorBy);
+  const latest = useRef({ plan, km, runs });
   useEffect(() => {
-    latest.current = { plan, km };
+    latest.current = { plan, km, runs };
   });
 
   useEffect(() => {
@@ -220,8 +267,8 @@ export default function RouteMap({
     runnerRef.current = new Marker({ element: el });
 
     map.on("style.load", () => {
-      const { plan: p2, km: k } = latest.current;
-      addOverlay(map, p2, k);
+      const { plan: p2, km: k, runs: r2 } = latest.current;
+      addOverlay(map, p2, r2, k);
       runnerRef.current?.setLngLat(pointAt(p2.track, k)).addTo(map);
       setStyleVersion((v) => v + 1);
     });
@@ -275,12 +322,14 @@ export default function RouteMap({
   }, [styleVersion, mapStyle, theme]);
 
   // Route data
+  const runsKey = runs.map((r) => `${r.key}:${r.startKm.toFixed(2)}`).join("|");
   useEffect(() => {
     const map = mapRef.current;
     if (!map || styleVersion === 0 || !map.getSource("route")) return;
-    (map.getSource("route") as GeoJSONSource).setData(routeSegments(plan));
+    (map.getSource("route") as GeoJSONSource).setData(routeLines(plan, runs));
+    (map.getSource("done") as GeoJSONSource).setData(routeLines(plan, runs, km));
     (map.getSource("stops") as GeoJSONSource).setData(stops(plan));
-  }, [styleVersion, plan]);
+  }, [styleVersion, plan, runsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   // Runner position, covered route, and the chase camera when following
@@ -288,7 +337,7 @@ export default function RouteMap({
     const map = mapRef.current;
     if (!map || styleVersion === 0 || !map.getSource("done")) return;
     const here = pointAt(plan.track, km);
-    (map.getSource("done") as GeoJSONSource).setData(routeSegments(plan, km));
+    (map.getSource("done") as GeoJSONSource).setData(routeLines(plan, latest.current.runs, km));
     runnerRef.current?.setLngLat(here);
     if (follow) {
       const ahead = pointAt(plan.track, Math.min(km + 0.15, plan.summary.totalKm));
@@ -309,7 +358,7 @@ export default function RouteMap({
     if (!map || styleVersion === 0 || popupEvents.length === 0) return;
     popupRef.current = new Popup({ closeButton: true, closeOnClick: false, maxWidth: "280px", offset: 14, className: styles.popup })
       .setLngLat(pointAt(plan.track, popupEvents[0].km))
-      .setDOMContent(popupContent(popupEvents))
+      .setDOMContent(popupContent(popupEvents, zones))
       .addTo(map);
   }, [popupKey, styleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -337,9 +386,7 @@ export default function RouteMap({
         ) : null}
       </div>
       <ul className={styles.legend} aria-label="Map legend">
-        <li><span className={styles.swatchClimb} aria-hidden="true" />Uphill</li>
-        <li><span className={styles.swatchDescent} aria-hidden="true" />Downhill</li>
-        <li><span className={styles.swatchFlat} aria-hidden="true" />Flat</li>
+        <RouteLegend colorBy={colorBy} />
         <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
         <li><span className={styles.swatchRing} aria-hidden="true" />Drink station</li>
         <li className={styles.legendNote}>Faded line is still ahead</li>
@@ -347,3 +394,4 @@ export default function RouteMap({
     </div>
   );
 }
+

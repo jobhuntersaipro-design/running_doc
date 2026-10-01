@@ -217,7 +217,7 @@
 
 .map,
 .mapPlaceholder {
-  height: clamp(260px, 42vw, 380px);
+  height: clamp(300px, 46vw, 460px);
   border-radius: calc(var(--radius-surface) - var(--space-6));
   overflow: hidden;
   background: var(--surface-muted);
@@ -323,7 +323,7 @@
 .nowStats dd {
   margin: var(--space-1) 0 0;
   font-size: var(--text-xl);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .effortRow {
@@ -471,7 +471,7 @@
 .tooltip {
   position: absolute;
   top: 0;
-  width: 150px;
+  width: 180px;
   display: grid;
   gap: 2px;
   padding: var(--space-2) var(--space-3);
@@ -806,4 +806,68 @@
   margin-top: var(--space-1);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+/* Zones */
+
+.toolbarGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.zone1 { --zone: color-mix(in oklch, var(--series-3) 30%, var(--surface)); }
+.zone2 { --zone: color-mix(in oklch, var(--series-3) 50%, var(--surface)); }
+.zone3 { --zone: color-mix(in oklch, var(--series-3) 72%, var(--surface)); }
+.zone4 { --zone: var(--series-3); }
+.zone5 { --zone: color-mix(in oklch, var(--series-3) 62%, var(--foreground)); }
+
+.zoneLine {
+  fill: none;
+  stroke: var(--zone);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.swatchZone {
+  width: 16px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--zone);
+}
+
+.zonesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.zonesGrid > * {
+  min-width: 0;
+}
+
+.zoneForm {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+.zoneBar {
+  display: block;
+  height: 6px;
+  margin-top: var(--space-1);
+  border-radius: 3px;
+  background: var(--zone);
+}
+
+.zoneTableHead {
+  display: grid;
+  gap: var(--space-1);
 }

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/
 import { ThemeSwitch, type Theme } from "@/components/arc/theme-switch/theme-switch";
 import { TimePicker } from "@/components/arc/time-picker/time-picker";
 import type { CourseInput } from "@/lib/courses/types";
-import { buildPlan, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
+import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
 import { CourseSetup } from "./course-setup";
 import { FuelPlan } from "./fuel-plan";
 import { HillsTable } from "./hills-table";
@@ -18,6 +18,8 @@ import { RaceRehearsal } from "./race-rehearsal";
 import { SplitsTable } from "./splits-table";
 import { clockAt } from "./util";
 import { WatchSetup } from "./watch-setup";
+import { ZonesPanel } from "./zones-panel";
+import { useZoneSettings } from "./zone-settings";
 import styles from "./planner.module.css";
 
 const MIN_PACE = 150;
@@ -64,6 +66,7 @@ export function Planner({ example }: { example: CourseInput }) {
   const [startTime, setStartTime] = useState(example.startTime ?? "06:00");
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light" as Theme);
   const [tab, setTab] = useState("splits");
+  const [zoneSettings, setZoneSettings] = useZoneSettings();
 
   const course = source === "example" ? example : uploaded;
   const km = course?.officialKm ?? 21.0975;
@@ -82,6 +85,8 @@ export function Planner({ example }: { example: CourseInput }) {
       stations: course.stations,
     });
   }, [course, goalSeconds]);
+
+  const zones = useMemo(() => (plan ? courseZones(plan, zoneSettings) : null), [plan, zoneSettings]);
 
   function changeGoal(text: string) {
     setGoalText(text);
@@ -160,7 +165,7 @@ export function Planner({ example }: { example: CourseInput }) {
         </div>
       </section>
 
-      {course && plan && summary ? (
+      {course && plan && summary && zones ? (
         <>
           <section className={styles.section} aria-labelledby="goal-heading">
             <h2 id="goal-heading" className={styles.h2}>Goal</h2>
@@ -215,21 +220,25 @@ export function Planner({ example }: { example: CourseInput }) {
             />
           </section>
 
-          <RaceRehearsal plan={plan} startTime={startTime} theme={theme} />
+          <RaceRehearsal plan={plan} zones={zones} startTime={startTime} theme={theme} />
 
           <Tabs value={tab} onValueChange={setTab} className={styles.tabs}>
             <TabsList aria-label="Plan details">
               <TabsTrigger value="splits">Splits</TabsTrigger>
               <TabsTrigger value="hills">Hills</TabsTrigger>
+              <TabsTrigger value="zones">Zones</TabsTrigger>
               <TabsTrigger value="fuel">Fuel and water</TabsTrigger>
               <TabsTrigger value="watch">Watch setup</TabsTrigger>
               <TabsTrigger value="band">Pace band</TabsTrigger>
             </TabsList>
             <TabsContent value="splits">
-              <SplitsTable plan={plan} startTime={startTime} />
+              <SplitsTable plan={plan} zones={zones} startTime={startTime} />
             </TabsContent>
             <TabsContent value="hills">
               <HillsTable plan={plan} />
+            </TabsContent>
+            <TabsContent value="zones">
+              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} />
             </TabsContent>
             <TabsContent value="fuel">
               <FuelPlan plan={plan} startTime={startTime} approximate={!!course.stationsApproximate} />

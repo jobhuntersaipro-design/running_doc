@@ -11,9 +11,10 @@ import { Progress } from "@/components/arc/progress/progress";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { formatClock, formatPace, kmAtTime, timeAt, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
+import { HR_ZONE_NAMES, PACE_ZONE_NAMES, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
 import type { MapStyle } from "./route-map";
+import type { ColorBy } from "./zone-style";
 import { TAG_LABEL, clockAt, paceAt } from "./util";
 import styles from "./planner.module.css";
 
@@ -28,6 +29,12 @@ const PLAYBACK = [
   { value: "180", label: "3 min" },
 ];
 
+const COLOR_BY: { value: ColorBy; label: string }[] = [
+  { value: "hills", label: "Hills" },
+  { value: "pace", label: "Pace zone" },
+  { value: "hr", label: "Heart rate zone" },
+];
+
 const MAP_STYLES: { value: MapStyle; label: string }[] = [
   { value: "streets", label: "Streets" },
   { value: "satellite", label: "Satellite" },
@@ -38,7 +45,7 @@ const MAP_STYLES: { value: MapStyle; label: string }[] = [
 const CALLOUT_KM = 0.5;
 const EPS = 1e-6;
 
-export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTime: string; theme: Theme }) {
+export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; zones: CourseZones; startTime: string; theme: Theme }) {
   const total = plan.summary.totalKm;
   const [km, setKm] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -47,6 +54,7 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>("streets");
   const [follow, setFollow] = useState(false);
+  const [colorBy, setColorBy] = useState<ColorBy>("hills");
   const kmRef = useRef(0);
   const reduce = useReducedMotion();
 
@@ -92,6 +100,7 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
   const split = plan.splits[Math.min(Math.floor(position), plan.splits.length - 1)];
   const finished = position >= total - EPS;
   const upcoming = plan.events.find((e) => e.km > position + EPS);
+  const here = zoneAt(zones, Math.min(position, total - EPS));
 
   // Events at the same spot (a station with a splash zone, say) show together.
   const anchor =
@@ -126,7 +135,10 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
       </div>
 
       <div className={styles.toolbar}>
-        <SegmentedControl label="Map style" value={mapStyle} onValueChange={(v) => setMapStyle(v as MapStyle)} options={MAP_STYLES} />
+        <div className={styles.toolbarGroup}>
+          <SegmentedControl label="Map style" value={mapStyle} onValueChange={(v) => setMapStyle(v as MapStyle)} options={MAP_STYLES} />
+          <SegmentedControl label="Color route by" value={colorBy} onValueChange={(v) => setColorBy(v as ColorBy)} options={COLOR_BY} />
+        </div>
         <div className={styles.switches}>
           <Switch label="Pause at each event" checked={pauseAtEvents} onCheckedChange={setPauseAtEvents} />
           <Switch label="Follow runner in 3D" checked={follow} onCheckedChange={setFollow} />
@@ -142,6 +154,8 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
             mapStyle={mapStyle}
             follow={follow}
             popupEvents={stoppedAt !== null ? group : []}
+            zones={zones}
+            colorBy={colorBy}
           />
         </div>
 
@@ -165,6 +179,18 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
               <dt>Target pace</dt>
               <dd className={styles.num}>
                 {formatPace(paceAt(plan, position))} <span className={styles.unit}>/km</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Pace zone</dt>
+              <dd className={styles.num}>
+                Z{here.paceZone} <span className={styles.unit}>{PACE_ZONE_NAMES[here.paceZone - 1].toLowerCase()}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Heart rate, estimated</dt>
+              <dd className={styles.num}>
+                {here.hr} <span className={styles.unit}>bpm, Z{here.hrZone} {HR_ZONE_NAMES[here.hrZone - 1].toLowerCase()}</span>
               </dd>
             </div>
           </dl>
@@ -226,7 +252,7 @@ export function RaceRehearsal({ plan, startTime, theme }: { plan: Plan; startTim
         <Progress className={styles.progress} value={position} max={total} label="Race progress" showValue />
       </div>
 
-      <ElevationChart plan={plan} km={position} onScrub={scrub} />
+      <ElevationChart plan={plan} km={position} onScrub={scrub} zones={zones} colorBy={colorBy} />
     </section>
   );
 }

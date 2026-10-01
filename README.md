@@ -8,6 +8,7 @@ A planner for beginner marathon and half marathon runners. Give it a course GPX 
 - **Watch setup**: a Garmin workout file (`.fit`, one step per km with a pace range), plus pace blocks and steps for Coros and Apple Watch.
 - **Pace band**: a printable wrist band with the race time and clock time at every marker.
 - **Race rehearsal**: an animated map and elevation profile with a progress bar. Playback pauses at each uphill, downhill, gel and station with what to do there.
+- **Zones**: enter your max and resting heart rate (or your own zones) and threshold pace to see which parts of the race fall in each heart rate and pace zone, on the map, the elevation chart, the splits and the live panel. Heart rate along the course is an estimate.
 - **Hills**: each uphill's start and top elevation, gradient, steepest stretch, target pace and the treadmill incline to practise it.
 - **Maps**: streets (OpenFreeMap, no API key), satellite (Esri) or 3D terrain (AWS Terrain Tiles), plus a camera that follows the runner. The route is coloured by uphill, downhill and flat, and a popup describes each event when playback pauses on it.
 

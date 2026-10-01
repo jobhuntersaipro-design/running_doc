@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { elevationAt, formatPace, type Plan } from "@/lib/planner";
+import { elevationAt, formatPace, zoneAt, type CourseZones, type Plan } from "@/lib/planner";
+import { RouteLegend } from "./route-legend";
+import type { ColorBy } from "./zone-style";
 import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
@@ -9,7 +11,19 @@ const HEIGHT = 200;
 const PAD = { left: 40, right: 12, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
 
-export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; onScrub: (km: number) => void }) {
+export function ElevationChart({
+  plan,
+  km,
+  onScrub,
+  zones,
+  colorBy,
+}: {
+  plan: Plan;
+  km: number;
+  onScrub: (km: number) => void;
+  zones: CourseZones;
+  colorBy: ColorBy;
+}) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [hover, setHover] = useState<number | null>(null);
@@ -75,10 +89,9 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
   return (
     <figure className={styles.chart}>
       <figcaption className={styles.chartHead}>
-        <span className={styles.h3}>Elevation and hills</span>
+        <span className={styles.h3}>{colorBy === "hills" ? "Elevation and hills" : colorBy === "pace" ? "Elevation by pace zone" : "Elevation by heart rate zone"}</span>
         <ul className={styles.legend} aria-label="Chart legend">
-          <li><span className={styles.swatchClimb} aria-hidden="true" />Uphill</li>
-          <li><span className={styles.swatchDescent} aria-hidden="true" />Downhill</li>
+          <RouteLegend colorBy={colorBy} />
           <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
           <li><span className={styles.swatchRing} aria-hidden="true" />Drink</li>
         </ul>
@@ -112,15 +125,19 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
           ))}
           <path d={area} className={styles.area} />
           <path d={profilePath} className={styles.profileLine} />
-          {plan.segments
-            .filter((s) => s.kind !== "flat")
-            .map((s) => (
-              <path
-                key={`${s.kind}-${s.startKm}`}
-                d={pathFor(s.startKm, s.endKm)}
-                className={s.kind === "uphill" ? styles.climbLine : styles.descentLine}
-              />
-            ))}
+          {colorBy === "hills"
+            ? plan.segments
+                .filter((s) => s.kind !== "flat")
+                .map((s) => (
+                  <path
+                    key={`${s.kind}-${s.startKm}`}
+                    d={pathFor(s.startKm, s.endKm)}
+                    className={s.kind === "uphill" ? styles.climbLine : styles.descentLine}
+                  />
+                ))
+            : (colorBy === "pace" ? zones.paceRuns : zones.hrRuns).map((r) => (
+                <path key={`z-${r.startKm}`} d={pathFor(r.startKm, r.endKm)} className={`${styles.zoneLine} ${styles[`zone${r.zone}`]}`} />
+              ))}
           {plan.hills
             .filter((h) => h.kind === "uphill")
             .map((h) => (
@@ -148,7 +165,7 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
         {hover !== null ? (
           <div
             className={styles.tooltip}
-            style={{ left: Math.min(width - 150, Math.max(0, x(hover) - 75)) }}
+            style={{ left: Math.min(width - 180, Math.max(0, x(hover) - 90)) }}
             aria-hidden="true"
           >
             <span className={styles.num}>Km {hover.toFixed(1)}</span>
@@ -156,7 +173,10 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
               {Math.round(elevationAt(plan.profile, hover))} m, {hoverGrade >= 0 ? "+" : ""}
               {hoverGrade.toFixed(1)}%
             </span>
-            <span className={styles.num}>{formatPace(paceAt(plan, hover))}/km target</span>
+            <span className={styles.num}>{formatPace(paceAt(plan, hover))}/km, pace Z{zoneAt(zones, hover).paceZone}</span>
+            <span className={styles.num}>
+              About {zoneAt(zones, hover).hr} bpm, Z{zoneAt(zones, hover).hrZone}
+            </span>
           </div>
         ) : null}
       </div>
