@@ -1,10 +1,11 @@
+import { buildPaceBlocks } from "./blocks";
 import { buildFuelEvents, DEFAULT_FUEL, type FuelOptions } from "./fuel";
 import { formatPace } from "./format";
 import { parseGpx } from "./gpx";
 import { DEFAULT_PACING, buildTimeline, timeAt, type PacingOptions } from "./pacing";
-import { buildProfile, elevationAt } from "./profile";
+import { buildProfile, elevationAt, haversineM } from "./profile";
 import { buildSegments } from "./segments";
-import type { EffortTag, Plan, PlanEvent, Segment, Split, Station } from "./types";
+import type { EffortTag, Plan, PlanEvent, Segment, Split, Station, TrackPoint, TrackSample } from "./types";
 
 export interface PlanInput {
   name: string;
@@ -57,6 +58,13 @@ function tagFor(
   if (endKm > totalKm - 3 && avgGrade > -3) return "push";
   if (prev && prev.avgGrade >= 1.2 && avgGrade < 0.5) return "recover";
   return "cruise";
+}
+
+function buildTrack(points: TrackPoint[], officialKm: number): TrackSample[] {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + haversineM(points[i - 1], points[i]));
+  const scale = officialKm / (cum[cum.length - 1] / 1000);
+  return points.map((p, i) => ({ lat: p.lat, lon: p.lon, km: (cum[i] / 1000) * scale }));
 }
 
 export function buildPlan(input: PlanInput): Plan {
@@ -120,6 +128,9 @@ export function buildPlan(input: PlanInput): Plan {
   return {
     name: input.name,
     profile,
+    track: buildTrack(points, input.officialKm),
+    timeline,
+    blocks: buildPaceBlocks(splits),
     segments,
     splits,
     events,

@@ -57,19 +57,20 @@ export function buildFuelEvents(
 
   const drinkStations = stations.filter(hasDrink).sort((a, b) => a.km - b.km);
 
-  for (const s of drinkStations) {
+  drinkStations.forEach((s, i) => {
     const isotonic = s.kinds.includes("isotonic");
     const water = s.kinds.includes("water");
     const what = isotonic && water ? "Water or isotonic" : isotonic ? "Isotonic" : "Water";
-    events.push(
-      make(
-        "drink",
-        s.km,
-        `${what} station`,
-        "Ease off for a few steps, take a cup, sip, and keep moving. Do not stop or run flat out through the tables.",
-      ),
-    );
-  }
+    const detail =
+      i === 0
+        ? "Ease off for a few steps, take a cup, sip, and keep moving. Do not stop or run flat out through the tables."
+        : isotonic && !water
+          ? "A few sips of isotonic for sugar and salt, then back to pace."
+          : isotonic
+            ? "A few sips. Isotonic adds sugar and salt; water is fine if your stomach prefers it."
+            : "A few sips and keep moving.";
+    events.push(make("drink", s.km, `${what} station`, detail));
+  });
   for (const s of stations) {
     if (s.kinds.includes("splash")) {
       events.push(make("cool", s.km, "Splash zone", "Wet your head and neck to cool down in the heat."));

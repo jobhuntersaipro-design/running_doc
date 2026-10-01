@@ -33,6 +33,8 @@ export function buildProfile(
   const n = Math.ceil(totalM / stepM);
   const xs: number[] = [];
   const raw: number[] = [];
+  const lat: number[] = [];
+  const lon: number[] = [];
   let j = 0;
   for (let i = 0; i <= n; i++) {
     const x = Math.min(i * stepM, totalM);
@@ -41,6 +43,8 @@ export function buildProfile(
     const f = span > 0 ? Math.min(1, Math.max(0, (x - dist[j]) / span)) : 0;
     xs.push(x);
     raw.push(points[j].ele + (points[j + 1].ele - points[j].ele) * f);
+    lat.push(points[j].lat + (points[j + 1].lat - points[j].lat) * f);
+    lon.push(points[j].lon + (points[j + 1].lon - points[j].lon) * f);
   }
 
   const ele = raw.map((_, i) => {
@@ -56,6 +60,8 @@ export function buildProfile(
     const hi = Math.min(n, i + 1);
     return {
       km: xs[i] / 1000,
+      lat: lat[i],
+      lon: lon[i],
       ele: e,
       grade: ((ele[hi] - ele[lo]) / (xs[hi] - xs[lo])) * 100,
     };

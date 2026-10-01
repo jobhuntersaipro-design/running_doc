@@ -4,9 +4,18 @@ export interface TrackPoint {
   ele: number;
 }
 
+/** An original GPX point with its distance along the course, for drawing the route. */
+export interface TrackSample {
+  lat: number;
+  lon: number;
+  km: number;
+}
+
 /** One sample every `stepM` metres along the (distance-normalised) course. */
 export interface ProfileSample {
   km: number;
+  lat: number;
+  lon: number;
   /** Smoothed elevation in metres. */
   ele: number;
   /** Smoothed gradient in percent. */
@@ -101,9 +110,20 @@ export interface PlanSummary {
   biggestClimb: Segment | null;
 }
 
+/** A run of consecutive kilometres at about the same pace, for typing into a watch. */
+export interface PaceBlock {
+  startKm: number;
+  endKm: number;
+  paceSecPerKm: number;
+  label: string;
+}
+
 export interface Plan {
   name: string;
   profile: ProfileSample[];
+  track: TrackSample[];
+  timeline: Timeline;
+  blocks: PaceBlock[];
   segments: Segment[];
   splits: Split[];
   events: PlanEvent[];
