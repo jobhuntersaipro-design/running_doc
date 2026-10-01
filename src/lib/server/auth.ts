@@ -3,12 +3,14 @@ import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 /**
- * Single-admin login. Credentials never live in the code: the server reads
- * ADMIN_EMAIL, ADMIN_PASSWORD_HASH ("scrypt:N:salt:hash", made with scripts/hash-password.mjs)
- * and AUTH_SECRET (signs the session cookie) from the environment.
+ * Sign-in. Runners sign in with Google (see /api/auth/google). The admin can
+ * also sign in with a password at /admin. Credentials never live in the code:
+ * the server reads ADMIN_EMAIL, ADMIN_PASSWORD_HASH ("scrypt:N:salt:hash",
+ * made with scripts/hash-password.mjs), AUTH_SECRET (signs the session cookie)
+ * and GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET from the environment.
  */
 
-const COOKIE = "admin_session";
+const COOKIE = "session";
 const SESSION_DAYS = 7;
 
 function scryptAsync(password: string, salt: Buffer, keylen: number, N: number): Promise<Buffer> {
@@ -43,9 +45,18 @@ function sign(payload: string): string {
   return createHmac("sha256", process.env.AUTH_SECRET ?? "").update(payload).digest("base64url");
 }
 
-export async function startSession(): Promise<void> {
+export interface SessionUser {
+  email: string;
+  name: string;
+  admin: boolean;
+}
+
+const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Signs the user in for SESSION_DAYS. The admin is whoever has ADMIN_EMAIL, by password or Google. */
+export async function startSession(user: { email: string; name: string }): Promise<void> {
   const payload = Buffer.from(
-    JSON.stringify({ sub: process.env.ADMIN_EMAIL, exp: Date.now() + SESSION_DAYS * 86400_000, n: randomBytes(8).toString("hex") }),
+    JSON.stringify({ sub: user.email, name: user.name, exp: Date.now() + SESSION_DAYS * 86400_000, n: randomBytes(8).toString("hex") }),
   ).toString("base64url");
   (await cookies()).set(COOKIE, `${payload}.${sign(payload)}`, {
     httpOnly: true,
@@ -60,17 +71,28 @@ export async function endSession(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
 
-/** True when the request carries a valid, unexpired admin session. */
-export async function isAdmin(): Promise<boolean> {
-  if (!adminConfigured()) return false;
+/** The signed-in user, from a valid and unexpired session cookie. */
+export async function getUser(): Promise<SessionUser | null> {
+  if (!process.env.AUTH_SECRET) return null;
   const value = (await cookies()).get(COOKIE)?.value;
-  if (!value) return false;
+  if (!value) return null;
   const [payload, signature] = value.split(".");
-  if (!payload || !signature || !safeEqual(Buffer.from(signature), Buffer.from(sign(payload)))) return false;
+  if (!payload || !signature || !safeEqual(Buffer.from(signature), Buffer.from(sign(payload)))) return null;
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as { sub?: string; exp?: number };
-    return data.sub === process.env.ADMIN_EMAIL && typeof data.exp === "number" && data.exp > Date.now();
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as { sub?: string; name?: string; exp?: number };
+    if (typeof data.sub !== "string" || typeof data.exp !== "number" || data.exp <= Date.now()) return null;
+    const admin = adminConfigured() && sameEmail(data.sub, process.env.ADMIN_EMAIL ?? "");
+    return { email: data.sub, name: data.name || data.sub, admin };
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function isAdmin(): Promise<boolean> {
+  return (await getUser())?.admin ?? false;
+}
+
+/** A same-site path to return to after sign-in; anything else goes home. */
+export function safeNext(next: string | null): string {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
 }

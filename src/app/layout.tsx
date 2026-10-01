@@ -7,7 +7,7 @@ const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Race plan",
+  title: { default: "Running Doc", template: "%s · Running Doc" },
   description: "Pace, fuel, hill and watch guidance for your marathon or half marathon.",
 };
 

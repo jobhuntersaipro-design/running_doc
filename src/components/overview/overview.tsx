@@ -7,7 +7,7 @@ import styles from "./overview.module.css";
 
 export type RaceCardData = Pick<
   RaceCard,
-  "id" | "event" | "category" | "dateLabel" | "location" | "startTime" | "officialUrl" | "files" | "km" | "gainM" | "drinkStops" | "preview" | "coverUrl"
+  "id" | "event" | "category" | "dateLabel" | "location" | "startTime" | "officialUrl" | "files" | "km" | "gainM" | "drinkStops" | "preview" | "coverUrl" | "private"
 >;
 
 function startLabel(hhmm?: string) {
@@ -17,7 +17,7 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per race. Opening a card shows its full race plan. */
-export function Overview({ races }: { races: RaceCardData[] }) {
+export function Overview({ races, signedIn }: { races: RaceCardData[]; signedIn: boolean }) {
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -51,7 +51,10 @@ export function Overview({ races }: { races: RaceCardData[] }) {
                 </div>
               )}
               <div className={styles.cardBody}>
-                <p className={styles.date}>{r.dateLabel}</p>
+                <p className={styles.date}>
+                  {r.dateLabel}
+                  {r.private ? ", only you can see this" : ""}
+                </p>
                 <h2 className={styles.cardTitle}>{r.event}</h2>
                 <p className={styles.meta}>
                   {r.category}, {r.location}
@@ -97,10 +100,12 @@ export function Overview({ races }: { races: RaceCardData[] }) {
         ))}
 
         <li className={`${styles.card} ${styles.addCard}`}>
-          <Link href="/races/custom" className={styles.addMain}>
+          <Link href={signedIn ? "/my/races/new" : "/signin?next=/my/races/new"} className={styles.addMain}>
             <Plus size={24} strokeWidth={1.75} aria-hidden="true" />
-            <span className={styles.cardTitle}>Plan another race</span>
-            <span className={styles.meta}>Upload the course GPX from any race and add its aid stations.</span>
+            <span className={styles.cardTitle}>Add your race</span>
+            <span className={styles.meta}>
+              Upload the course GPX, route map and race documents. {signedIn ? "Only you can see it." : "Sign in with Google first."}
+            </span>
           </Link>
         </li>
       </ul>
