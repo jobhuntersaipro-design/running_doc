@@ -86,7 +86,10 @@ function keyOf(url: string): string | null {
 async function r2Fetch(cfg: R2Config, pathAndQuery: string, init: RequestInit = {}, allowMissing = false): Promise<Response> {
   let res: Response;
   try {
-    res = await cfg.client.fetch(`${cfg.bucketUrl}${pathAndQuery}`, { ...init, cache: "no-store" });
+    // Sign only, then send the raw bytes: aws4fetch's own fetch streams the body without a
+    // Content-Length, and R2 rejects that with 411 MissingContentLength.
+    const signed = await cfg.client.sign(`${cfg.bucketUrl}${pathAndQuery}`, init);
+    res = await fetch(signed.url, { method: signed.method, headers: signed.headers, body: init.body, cache: "no-store" });
   } catch (e) {
     throw new StorageError(
       `Could not reach R2 at ${new URL(cfg.bucketUrl).host}. Check R2_ACCOUNT_ID (the 32 character account ID). (${(e as Error).message})`,
