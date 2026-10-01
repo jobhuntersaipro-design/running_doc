@@ -1,18 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { elevationAt, formatPace, type Plan } from "@/lib/planner";
+import { elevationAt, formatPace, type Plan, type PlanEvent } from "@/lib/planner";
+import { RouteLegend } from "./route-legend";
 import { paceAt } from "./util";
 import styles from "./planner.module.css";
 
-const HEIGHT = 200;
-const PAD = { left: 40, right: 12, top: 24, bottom: 48 };
+const HEIGHT = 168;
+/** Right padding matches the zone charts below so distances line up. */
+const PAD = { left: 40, right: 34 as number, top: 24, bottom: 48 };
 const MARKER_ROW = HEIGHT - 30;
 
-export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; onScrub: (km: number) => void }) {
+export function ElevationChart({
+  plan,
+  km,
+  onScrub,
+  hover,
+  onHover,
+  activeEvents,
+}: {
+  plan: Plan;
+  km: number;
+  onScrub: (km: number) => void;
+  /** Shared with the pace and heart rate charts so all three point at the same spot. */
+  hover: number | null;
+  onHover: (km: number | null) => void;
+  /** Events the rehearsal is showing now; they pulse on the chart. */
+  activeEvents: PlanEvent[];
+}) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
-  const [hover, setHover] = useState<number | null>(null);
   const dragging = useRef(false);
 
   useEffect(() => {
@@ -27,7 +44,9 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
   const eles = plan.profile.map((p) => p.ele);
   const min = Math.floor((Math.min(...eles) - 3) / 10) * 10;
   const max = Math.ceil((Math.max(...eles) + 3) / 10) * 10;
-  const plotW = width - PAD.left - PAD.right;
+  // Phones drop the right margin (and the zone names in it) to give the line room.
+  const padRight = width < 360 ? 12 : PAD.right;
+  const plotW = width - PAD.left - padRight;
   const baseY = MARKER_ROW - 18;
   const plotH = baseY - PAD.top;
   const x = (k: number) => PAD.left + (k / total) * plotW;
@@ -56,7 +75,7 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
   }
   function onPointerMove(e: PointerEvent<SVGSVGElement>) {
     const k = toKm(e.clientX);
-    setHover(k);
+    onHover(k);
     if (dragging.current) onScrub(k);
   }
   function onKeyDown(e: KeyboardEvent<SVGSVGElement>) {
@@ -77,8 +96,7 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
       <figcaption className={styles.chartHead}>
         <span className={styles.h3}>Elevation and hills</span>
         <ul className={styles.legend} aria-label="Chart legend">
-          <li><span className={styles.swatchClimb} aria-hidden="true" />Uphill</li>
-          <li><span className={styles.swatchDescent} aria-hidden="true" />Downhill</li>
+          <RouteLegend colorBy="hills" />
           <li><span className={styles.swatchGel} aria-hidden="true" />Gel</li>
           <li><span className={styles.swatchRing} aria-hidden="true" />Drink</li>
         </ul>
@@ -99,12 +117,12 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={() => (dragging.current = false)}
-          onPointerLeave={() => setHover(null)}
+          onPointerLeave={() => onHover(null)}
           onKeyDown={onKeyDown}
         >
           {ticks.map((t) => (
             <g key={t}>
-              <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} className={styles.grid} />
+              <line x1={PAD.left} x2={width - padRight} y1={y(t)} y2={y(t)} className={styles.grid} />
               <text x={PAD.left - 8} y={y(t)} className={styles.axisLabel} textAnchor="end" dominantBaseline="middle">
                 {Math.round(t)} m
               </text>
@@ -139,6 +157,14 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
           {gels.map((g) => (
             <circle key={`g-${g.km}`} cx={x(g.km)} cy={MARKER_ROW} r={5} className={styles.gelMark} />
           ))}
+          {activeEvents.slice(0, 1).map((e) => {
+            const onProfile = e.type === "uphill" || e.type === "downhill" || e.type === "start" || e.type === "push";
+            return (
+              <g key={`active-${e.type}-${e.km}`} className={styles[`event_${e.type}`]}>
+                <circle cx={x(e.km)} cy={onProfile ? y(elevationAt(plan.profile, e.km)) : MARKER_ROW} r={9} className={styles.chartPulse} />
+              </g>
+            );
+          })}
           {hover !== null ? (
             <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={baseY} className={styles.crosshair} />
           ) : null}
@@ -148,7 +174,7 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
         {hover !== null ? (
           <div
             className={styles.tooltip}
-            style={{ left: Math.min(width - 150, Math.max(0, x(hover) - 75)) }}
+            style={{ left: Math.min(width - 180, Math.max(0, x(hover) - 90)) }}
             aria-hidden="true"
           >
             <span className={styles.num}>Km {hover.toFixed(1)}</span>
@@ -160,7 +186,6 @@ export function ElevationChart({ plan, km, onScrub }: { plan: Plan; km: number; 
           </div>
         ) : null}
       </div>
-      <p className={styles.hint}>Drag along the chart, or focus it and use the arrow keys, to move through the race.</p>
     </figure>
   );
 }

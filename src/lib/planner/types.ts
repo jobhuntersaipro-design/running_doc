@@ -98,6 +98,10 @@ export interface PlanEvent {
   elapsedSeconds: number;
   title: string;
   detail: string;
+  /** What the runner is likely to feel here, so it is no surprise on the day. */
+  feel?: string;
+  /** A short phrase to repeat in your head. */
+  cue?: string;
   hill?: HillInfo;
 }
 
@@ -145,6 +149,19 @@ export interface PaceBlock {
   label: string;
 }
 
+/** A stretch of the race with its own job, for mental preparation. */
+export interface Chapter {
+  index: number;
+  title: string;
+  startKm: number;
+  endKm: number;
+  paceSecPerKm: number;
+  /** What the stretch will be like. */
+  expect: string;
+  /** What to think about and do. */
+  focus: string;
+}
+
 export interface Plan {
   name: string;
   profile: ProfileSample[];
@@ -155,5 +172,6 @@ export interface Plan {
   splits: Split[];
   events: PlanEvent[];
   hills: HillInfo[];
+  chapters: Chapter[];
   summary: PlanSummary;
 }
