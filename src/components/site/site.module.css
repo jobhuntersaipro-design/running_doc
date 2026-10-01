@@ -1,0 +1,17 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.brand {
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.brand:hover {
+  color: var(--text-secondary);
+}

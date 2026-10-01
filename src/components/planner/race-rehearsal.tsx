@@ -11,7 +11,7 @@ import { Slider } from "@/components/arc/slider/slider";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
+import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, elevationAt, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
 import { EventIcon } from "./event-icon";
 import { ZoneChart } from "./zone-chart";
@@ -24,11 +24,13 @@ const RouteMap = dynamic(() => import("./route-map"), {
   loading: () => <div className={styles.mapPlaceholder} aria-busy="true" />,
 });
 
-const PLAYBACK = [
-  { value: "30", label: "30 s" },
-  { value: "60", label: "1 min" },
-  { value: "180", label: "3 min" },
+/** Replay speed; 1x plays the whole race in one minute. */
+const SPEEDS = [
+  { value: "0.5", label: "0.5x" },
+  { value: "1", label: "1x" },
+  { value: "1.5", label: "1.5x" },
 ];
+const SECONDS_AT_1X = 60;
 
 const MAP_STYLES: { value: MapStyle; label: string }[] = [
   { value: "streets", label: "Streets" },
@@ -44,7 +46,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const total = plan.summary.totalKm;
   const [km, setKm] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [length, setLength] = useState("60");
+  const [speed, setSpeed] = useState("1");
   const [pauseAtEvents, setPauseAtEvents] = useState(true);
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>("streets");
@@ -69,7 +71,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   useEffect(() => {
     if (!playing) return;
     const goal = plan.summary.goalSeconds;
-    const rate = goal / Number(length);
+    const rate = (goal / SECONDS_AT_1X) * Number(speed);
     let last = performance.now();
     let frame = requestAnimationFrame(function tick(now) {
       // The first frame's timestamp can be a hair before `last`; never step backwards,
@@ -97,7 +99,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
       frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing, length, plan, total, pauseAtEvents]);
+  }, [playing, speed, plan, total, pauseAtEvents]);
 
   const position = Math.min(km, total);
   const elapsed = timeAt(plan.timeline, position);
@@ -112,6 +114,12 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     [...plan.events].reverse().find((e) => e.km <= position + EPS && position - e.km < CALLOUT_KM && (position > 0 || e.type === "start"))?.km ??
     null;
   const group = anchor === null ? [] : plan.events.filter((e) => Math.abs(e.km - anchor) < EPS);
+  const gradeHere = plan.profile[Math.min(plan.profile.length - 1, Math.round((position / total) * (plan.profile.length - 1)))].grade;
+  const hud = [
+    { label: "Pace", value: `${formatPace(here.pace)}/km`, detail: `Z${here.paceZone}`, zone: here.paceZone },
+    { label: "Heart rate", value: `${here.hr} bpm`, detail: `Z${here.hrZone}`, zone: here.hrZone },
+    { label: "Elevation", value: `${Math.round(elevationAt(plan.profile, position))} m`, detail: `${gradeHere >= 0 ? "+" : ""}${gradeHere.toFixed(1)}%` },
+  ];
   const part = plan.chapters.find((c) => position >= c.startKm - EPS && position < c.endKm - EPS) ?? plan.chapters[plan.chapters.length - 1];
 
   // On phones the parts are a swipeable row; keep the current part in view without moving the page.
@@ -145,10 +153,8 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
       <div className={styles.sectionHead}>
         <h2 id="rehearsal-heading" className={styles.h2}>Race rehearsal</h2>
         <div className={styles.playbackControl}>
-          <span className={styles.muted}>
-            Replay the whole race in
-          </span>
-          <SegmentedControl label="Replay the whole race in" value={length} onValueChange={setLength} options={PLAYBACK} />
+          <span className={styles.muted}>Replay speed, 1x is the whole race in 1 minute</span>
+          <SegmentedControl label="Replay speed" value={speed} onValueChange={setSpeed} options={SPEEDS} />
         </div>
       </div>
 
@@ -172,6 +178,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
             zones={zones}
             colorBy="hills"
             activeEvents={group}
+            hud={hud}
           />
         </div>
 

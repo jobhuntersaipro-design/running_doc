@@ -1,9 +1,9 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { Planner } from "@/components/planner/planner";
-import { klscm2026Hm } from "@/lib/courses/klscm-2026-hm";
+import { Overview } from "@/components/overview/overview";
+import { overviewRaces } from "@/lib/server/races";
+
+// Races added in /admin appear without a rebuild.
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const gpx = await readFile(path.join(process.cwd(), "data", "klscm-2026-hm", "course.gpx"), "utf8");
-  return <Planner example={{ ...klscm2026Hm, gpx }} />;
+  return <Overview races={await overviewRaces()} />;
 }

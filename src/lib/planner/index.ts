@@ -11,3 +11,4 @@ export { hillInfo, treadmillIncline, MIN_HILL_M } from "./hills";
 export * from "./zones";
 export { addRunnerNotes, buildChapters } from "./mind";
 export * from "./benchmarks";
+export { routePreview } from "./preview";
