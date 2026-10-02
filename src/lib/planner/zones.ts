@@ -51,6 +51,23 @@ export const DEFAULT_ZONE_SETTINGS: ZoneSettings = {
   thresholdPace: null,
 };
 
+const inRange = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+
+/** Checks settings read from storage or sent by a browser. */
+export function isZoneSettings(v: unknown): v is ZoneSettings {
+  const s = v as ZoneSettings;
+  return (
+    !!s &&
+    inRange(s.hr?.maxHr, 100, 240) &&
+    inRange(s.hr?.restingHr, 25, 120) &&
+    ["max", "reserve", "custom"].includes(s.hr?.method) &&
+    Array.isArray(s.hr?.customStarts) &&
+    s.hr.customStarts.length === 5 &&
+    s.hr.customStarts.every((n) => inRange(n, 30, 240)) &&
+    (s.thresholdPace === null || inRange(s.thresholdPace, 120, 900))
+  );
+}
+
 export function hrZones(s: HrSettings): HrZone[] {
   const starts =
     s.method === "custom"

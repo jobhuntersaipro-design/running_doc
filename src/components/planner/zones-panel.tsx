@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
@@ -16,6 +18,7 @@ import {
   type Plan,
   type ZoneSettings,
 } from "@/lib/planner";
+import type { ZoneAccount } from "./zone-settings";
 import styles from "./planner.module.css";
 
 const METHODS: { value: HrSettings["method"]; label: string }[] = [
@@ -57,12 +60,15 @@ export function ZonesPanel({
   zones,
   settings,
   onSettingsChange,
+  account,
 }: {
   plan: Plan;
   zones: CourseZones;
   settings: ZoneSettings;
   onSettingsChange: (next: ZoneSettings) => void;
+  account: ZoneAccount;
 }) {
+  const pathname = usePathname();
   const [paceDraft, setPaceDraft] = useState<string | null>(null);
   const hr = settings.hr;
   const estimate = estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
@@ -191,8 +197,16 @@ export function ZonesPanel({
         </ZoneSection>
       </div>
 
+      {account === "signed-out" ? (
+        <p className={styles.zoneSignIn}>
+          Your zones are only saved in this browser.{" "}
+          <Link href={`/signin?next=${encodeURIComponent(pathname)}`}>Sign in to save them to your account</Link> and use them on
+          any device.
+        </p>
+      ) : null}
+
       <p className={styles.hint}>
-        Your settings are saved in this browser. On uphills the pace zone drops while heart rate rises: hold the effort, not the
+        {account === "signed-in" ? "Your zones are saved to your account. " : ""}On uphills the pace zone drops while heart rate rises: hold the effort, not the
         pace. Race heart rates are estimates from typical effort for your goal time; heat, fitness and the day change them.
       </p>
     </div>

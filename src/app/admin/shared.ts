@@ -8,6 +8,7 @@ export interface FormState {
 }
 
 export const DISTANCES = [
+  { value: "5k", label: "5K", km: 5 },
   { value: "10k", label: "10K", km: 10 },
   { value: "half", label: "Half marathon", km: 21.0975 },
   { value: "full", label: "Marathon", km: 42.195 },

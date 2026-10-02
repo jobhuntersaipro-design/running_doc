@@ -7,3 +7,7 @@ const from = "node_modules/maplibre-gl/dist";
 const to = "public/maplibre";
 mkdirSync(to, { recursive: true });
 for (const file of ["maplibre-gl-worker.mjs", "maplibre-gl-shared.mjs"]) copyFileSync(`${from}/${file}`, `${to}/${file}`);
+
+// pdf.js renders the route map preview the same way: its worker is served from public/.
+mkdirSync("public/pdfjs", { recursive: true });
+copyFileSync("node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs", "public/pdfjs/pdf.worker.min.mjs");

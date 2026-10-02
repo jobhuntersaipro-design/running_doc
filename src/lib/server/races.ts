@@ -24,7 +24,7 @@ export interface StoredRace {
   dateLabel: string;
   location: string;
   officialUrl: string;
-  distance: "10k" | "half" | "full" | "custom";
+  distance: "5k" | "10k" | "half" | "full" | "custom";
   officialKm: number;
   startTime?: string;
   stations: Station[];

@@ -120,7 +120,9 @@ export function TabsContent({ className, value, forceMount, children, ...props }
     const from = panelHeightRef.current;
     const to = node.offsetHeight;
     let controls: AnimationPlaybackControls | undefined;
-    const release = () => { node.style.height = ""; node.style.overflow = ""; };
+    // Hand the height back to Motion as "auto", not just the inline style: Motion keeps the animated value and
+    // writes it again on its next render (a layout animation inside the panel triggers one), freezing the old height.
+    const release = () => { if (node.style.height) animate(node, { height: "auto" }, { duration: 0 }); node.style.height = ""; node.style.overflow = ""; };
     if (from !== null && Math.abs(from - to) > 1 && !reduced) {
       if (to > from) node.style.overflow = "clip";
       controls = animate(node, { height: [from, to] }, { ...motionTokens.spring.smooth, onComplete: release });
