@@ -14,7 +14,7 @@
 .table th[data-sorted] { color: var(--foreground); }
 .table td { height: 52px; padding: 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); color: var(--foreground); font-weight: 400; vertical-align: middle; overflow-wrap: anywhere; }
 .table tbody tr:last-child td { border-bottom: 0; }
-.table [data-numeric] { text-align: right; font-variant-numeric: tabular-nums; }
+.table [data-numeric] { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table[data-selectable] tbody tr { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .table[data-selectable] tbody tr[data-selected] td { --cell-fill: color-mix(in oklch, var(--accent) 8%, var(--cell-base)); }
 .table[data-selectable] [data-primary]:not([data-sortable]), .table[data-selectable] th[data-primary] .sortButton { padding-left: var(--space-2); }
