@@ -28,7 +28,7 @@ function useObjectUrl(file: File | null) {
   return url;
 }
 
-export function RaceForm({ race }: { race: StoredRace | null }) {
+export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** Event names already in use, suggested so distances group under one event. */ events?: string[] }) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(saveRace, {});
   const [distance, setDistance] = useState<DistanceValue>(race?.distance ?? "half");
   const [customKm, setCustomKm] = useState(race?.distance === "custom" ? String(race.officialKm) : "");
@@ -105,9 +105,17 @@ export function RaceForm({ race }: { race: StoredRace | null }) {
           name="event"
           defaultValue={race?.event}
           placeholder="Standard Chartered KL Marathon 2026"
+          description="Use the same event name for each distance (5K, 10K, half, full) so they share one card with a tab per distance."
+          list="event-names"
+          autoComplete="off"
           error={fe.event}
           required
         />
+        <datalist id="event-names">
+          {events.map((e) => (
+            <option key={e} value={e} />
+          ))}
+        </datalist>
         <Input
           label="Category"
           name="category"

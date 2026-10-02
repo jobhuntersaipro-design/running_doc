@@ -221,3 +221,55 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     files: filesOf(r),
   };
 }
+
+/** One event on the overview, such as a city marathon, with each distance it offers. */
+export interface RaceEvent {
+  key: string;
+  event: string;
+  dateLabel: string;
+  date?: string;
+  location: string;
+  officialUrl: string;
+  /** The race the card opens and shows: the one with a cover, else the longest. */
+  main: RaceCard;
+  /** Every distance, shortest first. */
+  races: RaceCard[];
+  private: boolean;
+}
+
+/**
+ * Groups races by event name, so a 10K and a half marathon added under the same
+ * event share one card. A runner's private races group on their own.
+ */
+export function groupByEvent(races: RaceCard[]): RaceEvent[] {
+  const groups = new Map<string, RaceCard[]>();
+  for (const r of races) {
+    const key = `${r.owner?.toLowerCase() ?? ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  return [...groups.entries()]
+    .map(([key, list]) => {
+      const sorted = [...list].sort((a, b) => a.km - b.km);
+      const main = sorted.find((r) => r.coverUrl) ?? sorted[sorted.length - 1];
+      const date = sorted.map((r) => r.date).filter(Boolean).sort()[0];
+      return {
+        key,
+        event: main.event,
+        dateLabel: (sorted.find((r) => r.date === date) ?? main).dateLabel,
+        date,
+        location: main.location,
+        officialUrl: main.officialUrl,
+        main,
+        races: sorted,
+        private: main.private,
+      };
+    })
+    .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
+}
+
+/** Event names to suggest in the race form: public events for the admin, a runner's own events for them. */
+export async function eventNames(viewer: Viewer): Promise<string[]> {
+  const races = await overviewRaces(viewer).catch(() => []);
+  const own = races.filter((r) => (viewer.admin ? !r.owner : r.owner?.toLowerCase() === viewer.email.toLowerCase()));
+  return [...new Set(own.map((r) => r.event))].sort();
+}

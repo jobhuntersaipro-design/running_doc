@@ -19,7 +19,7 @@ The first race is the 2026 KL Marathon half marathon. Its aid station distances 
 
 ### Adding a race
 
-The easy way is `/admin`: sign in, then add the race's details, course GPX, route map PDF and card cover. It shows on the overview straight away.
+The easy way is `/admin`: sign in, then add the race's details, course GPX, route map PDF and card cover. It shows on the overview straight away. Give each distance of an event (5K, 10K, half, full) the same event name: they share one card with a ribbon per distance, and the race page gets a tab for each.
 
 To build a race into the code instead:
 
