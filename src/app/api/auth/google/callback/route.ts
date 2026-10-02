@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { safeNext, startSession } from "@/lib/server/auth";
+import { recordSignIn } from "@/lib/server/runners";
 import { welcomeOnce } from "@/lib/server/welcome";
 
 interface IdToken {
@@ -58,7 +59,8 @@ export async function GET(req: Request) {
   if (!valid) return fail();
 
   await startSession({ email: claims.email!, name: claims.name || claims.email! });
-  // After the redirect is sent, so sign-in never waits on the email.
+  // After the redirect is sent, so sign-in never waits on the email or the database.
   after(() => welcomeOnce(claims.email!, claims.name ?? "", url.origin).catch((e) => console.error("Welcome email failed:", e)));
+  after(() => recordSignIn(claims.email!, claims.name ?? "").catch((e) => console.error("Recording sign-in failed:", e)));
   return Response.redirect(new URL(safeNext(expected.next ?? null), url.origin), 302);
 }
