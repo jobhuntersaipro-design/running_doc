@@ -3,6 +3,7 @@
 import { Badge } from "@/components/arc/badge/badge";
 import { SortableDataTable, type DataColumn } from "@/components/arc/sortable-data-table/sortable-data-table";
 import { averageHr, formatClock, formatPace, hrZoneFor, paceZoneFor, type CourseZones, type EffortTag, type Plan } from "@/lib/planner";
+import { SplitBars } from "./split-bars";
 import { TAG_LABEL, clockAt } from "./util";
 import styles from "./planner.module.css";
 
@@ -54,6 +55,7 @@ export function SplitsTable({ plan, zones, startTime }: { plan: Plan; zones: Cou
         Each row is the kilometre that ends at that marker. Pace changes with the hills so the effort stays even and the total
         still hits your goal. Heart rate is an estimate from your zones; set them in the Zones tab.
       </p>
+      <SplitBars plan={plan} />
       <div className={styles.desktopOnly}>
         <SortableDataTable rows={rows} columns={columns} rowKey="id" caption="Kilometre splits" itemName={{ one: "split", other: "splits" }} />
       </div>

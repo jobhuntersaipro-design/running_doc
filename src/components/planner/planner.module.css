@@ -2180,3 +2180,63 @@
   background: var(--surface);
   box-shadow: var(--shadow-floating);
 }
+
+/* Strava-style pace bars in the Splits tab */
+
+.splitChart {
+  max-width: 720px;
+}
+
+.splitBars {
+  position: relative;
+  font-size: var(--text-sm);
+}
+
+.splitTip {
+  right: 6ch;
+  width: 220px;
+}
+
+.splitList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.splitRow {
+  display: grid;
+  grid-template-columns: 3.5ch 4.5ch minmax(0, 1fr) 6ch;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+}
+
+.splitRow > :last-child {
+  text-align: right;
+}
+
+.splitRow[data-active] {
+  background: var(--surface-muted);
+}
+
+.splitAxis {
+  padding-bottom: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.splitTrack {
+  position: relative;
+  align-self: stretch;
+  min-height: 24px;
+}
+
+.splitFill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  border-radius: 0 4px 4px 0;
+  background: var(--series-1);
+}
