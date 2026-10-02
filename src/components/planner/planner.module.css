@@ -103,6 +103,13 @@
   align-items: start;
 }
 
+.goalTime {
+  --number-field-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 .goalGrid > * {
   min-width: 0;
 }
