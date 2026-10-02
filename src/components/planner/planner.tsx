@@ -69,8 +69,8 @@ export function Planner({
   distances?: { id: string; label: string; current: boolean }[];
 }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
-  const [goalText, setGoalText] = useState("1:59:00");
-  const [goalSeconds, setGoalSeconds] = useState(parseDuration("1:59:00"));
+  const [goalText, setGoalText] = useState(() => defaultGoalFor(race?.officialKm ?? 21.0975));
+  const [goalSeconds, setGoalSeconds] = useState(() => parseDuration(defaultGoalFor(race?.officialKm ?? 21.0975)));
   const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
