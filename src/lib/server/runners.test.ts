@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const db = vi.hoisted(() => ({ queries: [] as { text: string; values: unknown[] }[], failNext: 0 }));
+const db = vi.hoisted(() => ({ queries: [] as { text: string; values: unknown[] }[], failNext: 0, profile: null as unknown }));
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     if (db.failNext-- > 0) throw new Error("network");
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     db.queries.push({ text, values });
+    if (text.startsWith("select profile")) return [{ profile: db.profile }];
     return text.startsWith("select") ? [{ email: "alex@gmail.com", name: "Alex Tan", signed_up_at: new Date("2026-10-02T08:05:00Z") }] : [];
   },
 }));
@@ -23,6 +24,7 @@ describe("runners", () => {
     vi.unstubAllEnvs();
     db.queries = [];
     db.failNext = 0;
+    db.profile = null;
   });
 
   it("does nothing without a database", async () => {
@@ -39,8 +41,8 @@ describe("runners", () => {
     expect(await listRunners()).toEqual([{ email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z" }]);
     expect(db.queries.at(-1)?.text).toContain("order by signed_up_at desc");
     expect(db.queries.filter((q) => q.text.startsWith("create table")).length).toBe(1);
-    expect(db.queries[1]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
-    expect(db.queries[1].text).toContain("on conflict (email) do update");
+    expect(db.queries[2]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
+    expect(db.queries[2].text).toContain("on conflict (email) do update");
   });
 
   it("retries creating the table after a failure", async () => {
@@ -48,6 +50,17 @@ describe("runners", () => {
     db.failNext = 1;
     await expect(recordSignIn("a@gmail.com", "A")).rejects.toThrow("network");
     await recordSignIn("a@gmail.com", "A");
-    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "insert"]);
+    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "insert"]);
+  });
+
+  it("saves a profile as JSON and only returns a valid one", async () => {
+    const { saveProfile, getProfile } = await load("postgres://neon");
+    const profile = { age: 35, sex: "female" as const, heightCm: null, weightKg: 58, vo2max: 48 };
+    expect(await saveProfile("Alex@Gmail.com", "Alex", profile)).toBe(true);
+    expect(db.queries.at(-1)?.values).toEqual(["alex@gmail.com", "Alex", JSON.stringify(profile)]);
+    db.profile = profile;
+    expect(await getProfile("alex@gmail.com")).toEqual(profile);
+    db.profile = { age: "old" };
+    expect(await getProfile("alex@gmail.com")).toBeNull();
   });
 });

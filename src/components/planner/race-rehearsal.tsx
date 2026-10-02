@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/arc/badge/badge";
@@ -11,7 +12,7 @@ import { Slider } from "@/components/arc/slider/slider";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
-import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, elevationAt, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
+import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, elevationAt, energyKcal, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent, type RunnerProfile } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
 import { RaceStrategy } from "./race-strategy";
 import { EventIcon } from "./event-icon";
@@ -43,7 +44,7 @@ const MAP_STYLES: { value: MapStyle; label: string }[] = [
 const CALLOUT_KM = 0.5;
 const EPS = 1e-6;
 
-export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; zones: CourseZones; startTime: string; theme: Theme }) {
+export function RaceRehearsal({ plan, zones, startTime, theme, profile }: { plan: Plan; zones: CourseZones; startTime: string; theme: Theme; profile: RunnerProfile }) {
   const total = plan.summary.totalKm;
   const [km, setKm] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -179,6 +180,11 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
     setKm(next);
   }
 
+  const personalised = [profile.age !== null && "age", profile.vo2max !== null && "VO2 max", profile.weightKg !== null && "weight"]
+    .filter(Boolean)
+    .join(", ")
+    .replace(/, ([^,]*)$/, " and $1");
+
   const playLabel = playing ? "Pause" : finished ? "Replay race" : stoppedAt !== null ? "Continue" : position > 0 ? "Resume" : "Play race";
 
   return (
@@ -251,7 +257,18 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
           onHover={setHover}
           onScrub={scrub}
         />
-        <p className={styles.hint}>Drag along a chart to move through the race. Set your own zones in the Zones tab.</p>
+        <p className={styles.hint}>
+          Drag along a chart to move through the race. Set your own zones in the Zones tab.{" "}
+          {personalised ? (
+            <>
+              Personalised with your {personalised} from <Link href="/settings">Settings</Link>.
+            </>
+          ) : (
+            <>
+              Add your age, weight and VO2 max in <Link href="/settings">Settings</Link> to fit heart rate and energy to you.
+            </>
+          )}
+        </p>
       </div>
 
       </div>
@@ -317,6 +334,14 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
                 {here.hr} <span className={styles.unit}>bpm, Z{here.hrZone} {HR_ZONE_NAMES[here.hrZone - 1].toLowerCase()}</span>
               </dd>
             </div>
+            {profile.weightKg !== null ? (
+              <div>
+                <dt>Energy used, estimated</dt>
+                <dd className={styles.num}>
+                  {energyKcal(profile.weightKg, position)} <span className={styles.unit}>kcal</span>
+                </dd>
+              </div>
+            ) : null}
           </dl>
 
           <div className={styles.effortRow}>

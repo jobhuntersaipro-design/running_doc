@@ -1,4 +1,5 @@
 import type { Plan } from "./types";
+import { EMPTY_PROFILE, hrShareFromVo2Share, maxHrFromAge, thresholdFromVo2max, vo2maxShare, type RunnerProfile } from "./runner";
 
 export type ZoneNumber = 1 | 2 | 3 | 4 | 5;
 export const ZONES: ZoneNumber[] = [1, 2, 3, 4, 5];
@@ -50,6 +51,15 @@ export const DEFAULT_ZONE_SETTINGS: ZoneSettings = {
   hr: { maxHr: 190, restingHr: 60, method: "max", customStarts: [95, 114, 133, 152, 171] },
   thresholdPace: null,
 };
+
+const sameHr = (a: HrSettings, b: HrSettings) =>
+  a.maxHr === b.maxHr && a.restingHr === b.restingHr && a.method === b.method && a.customStarts.join() === b.customStarts.join();
+
+/** Zone settings with the profile filled in: until the runner sets their own heart rate, their age sets the max. */
+export function withProfile(settings: ZoneSettings, profile: RunnerProfile): ZoneSettings {
+  if (profile.age === null || !sameHr(settings.hr, DEFAULT_ZONE_SETTINGS.hr)) return settings;
+  return { ...settings, hr: { ...settings.hr, maxHr: maxHrFromAge(profile.age, profile.sex) } };
+}
 
 const inRange = (v: unknown, min: number, max: number) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
 
@@ -115,7 +125,7 @@ export function estimateThresholdPace(goalSeconds: number, km: number): number {
 }
 
 /** Share of max HR a runner typically averages for a race of this duration. */
-function raceHrFraction(goalSeconds: number): number {
+export function raceHrFraction(goalSeconds: number): number {
   const hours = goalSeconds / 3600;
   return Math.min(0.92, Math.max(0.75, 0.885 - 0.05 * Math.log(hours)));
 }
@@ -127,12 +137,12 @@ export interface HrContext {
 }
 
 /**
- * Estimated heart rate at a point in the race: the typical race average for
- * this duration, a little lower over the easy start, drifting up as the race
+ * Estimated heart rate at a point in the race: `base` (the race average as a
+ * share of max HR), a little lower over the easy start, drifting up as the race
  * goes on, up on climbs and the final push, down on descents.
  */
-export function estimateHr(maxHr: number, goalSeconds: number, ctx: HrContext): number {
-  let f = raceHrFraction(goalSeconds);
+export function estimateHr(maxHr: number, base: number, ctx: HrContext): number {
+  let f = base;
   if (ctx.km < 2) f -= 0.03 * (1 - ctx.km / 2);
   f += 0.03 * (ctx.km / ctx.totalKm) - 0.015; // cardiac drift, centred on the race average
   if (ctx.gradePct >= 1.2) f += Math.min(0.03, 0.01 * ctx.gradePct);
@@ -141,8 +151,18 @@ export function estimateHr(maxHr: number, goalSeconds: number, ctx: HrContext): 
   return Math.round(Math.min(maxHr, maxHr * f));
 }
 
-export function thresholdFor(plan: Plan, settings: ZoneSettings): number {
-  return settings.thresholdPace ?? estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
+/** Threshold pace when the runner has not set one: from their VO2 max if known, else from the goal. */
+function estimatedThreshold(plan: Plan, profile: RunnerProfile): number {
+  return profile.vo2max ? thresholdFromVo2max(profile.vo2max) : estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
+}
+
+/**
+ * The race's average heart rate as a share of max. With a VO2 max it follows how hard the goal pace is for this
+ * runner; without one, what runners typically average for a race this long.
+ */
+function raceHrBase(plan: Plan, profile: RunnerProfile): number {
+  const { goalSeconds, totalKm } = plan.summary;
+  return profile.vo2max ? hrShareFromVo2Share(vo2maxShare(goalSeconds / totalKm, profile.vo2max)) : raceHrFraction(goalSeconds);
 }
 
 export interface ZoneRun {
@@ -155,7 +175,11 @@ export interface CourseZones {
   hrZones: HrZone[];
   paceZones: PaceZone[];
   thresholdPace: number;
-  thresholdEstimated: boolean;
+  /** Whether thresholdPace is the runner's own; otherwise it is thresholdEstimate. */
+  thresholdSet: boolean;
+  /** The threshold pace used when the runner has not set one, and what it is estimated from. */
+  thresholdEstimate: number;
+  thresholdEstimateFrom: "vo2max" | "goal";
   /** Per 100 m interval of the profile. */
   intervals: { startKm: number; endKm: number; pace: number; hr: number; paceZone: ZoneNumber; hrZone: ZoneNumber }[];
   paceRuns: ZoneRun[];
@@ -196,9 +220,11 @@ function runsOf(intervals: CourseZones["intervals"], key: "paceZone" | "hrZone")
   }
 }
 
-/** Pace and heart rate zones along the whole course. */
-export function courseZones(plan: Plan, settings: ZoneSettings): CourseZones {
-  const threshold = thresholdFor(plan, settings);
+/** Pace and heart rate zones along the whole course, personalised by the runner's profile when there is one. */
+export function courseZones(plan: Plan, settings: ZoneSettings, profile: RunnerProfile = EMPTY_PROFILE): CourseZones {
+  const estimate = estimatedThreshold(plan, profile);
+  const threshold = settings.thresholdPace ?? estimate;
+  const base = raceHrBase(plan, profile);
   const hz = hrZones(settings.hr);
   const totalKm = plan.summary.totalKm;
   const p = plan.profile;
@@ -209,7 +235,7 @@ export function courseZones(plan: Plan, settings: ZoneSettings): CourseZones {
     const lenKm = p[i + 1].km - p[i].km;
     const pace = plan.timeline.paceSecPerKm[i];
     const grade = ((p[i + 1].ele - p[i].ele) / (lenKm * 1000)) * 100;
-    const hr = estimateHr(settings.hr.maxHr, plan.summary.goalSeconds, { km: p[i].km + lenKm / 2, totalKm, gradePct: grade });
+    const hr = estimateHr(settings.hr.maxHr, base, { km: p[i].km + lenKm / 2, totalKm, gradePct: grade });
     const paceZone = paceZoneFor(threshold, pace);
     const hrZone = hrZoneFor(hz, hr);
     paceSeconds[paceZone - 1] += pace * lenKm;
@@ -220,7 +246,9 @@ export function courseZones(plan: Plan, settings: ZoneSettings): CourseZones {
     hrZones: hz,
     paceZones: paceZones(threshold),
     thresholdPace: threshold,
-    thresholdEstimated: settings.thresholdPace === null,
+    thresholdSet: settings.thresholdPace !== null,
+    thresholdEstimate: estimate,
+    thresholdEstimateFrom: profile.vo2max ? "vo2max" : "goal",
     intervals,
     paceRuns: runsOf(intervals, "paceZone"),
     hrRuns: runsOf(intervals, "hrZone"),

@@ -9,6 +9,7 @@ export { elevationAt, haversineM } from "./profile";
 export { buildPlan, type PlanInput } from "./plan";
 export { hillInfo, treadmillIncline, MIN_HILL_M } from "./hills";
 export * from "./zones";
+export * from "./runner";
 export { addRunnerNotes, buildChapters } from "./mind";
 export * from "./benchmarks";
 export { routePreview } from "./preview";

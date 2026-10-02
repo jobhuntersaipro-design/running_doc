@@ -1,15 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Flag, HeartPulse, Settings, ShieldCheck } from "lucide-react";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
+import { UserMenu } from "@/components/arc/user-menu/user-menu";
+import { logout } from "@/app/admin/actions";
 import { setTheme, useTheme } from "./theme";
 import styles from "./site.module.css";
 
-type Me = { name: string; admin: boolean } | null;
+type Me = { name: string; email: string; admin: boolean } | null;
+
+const icon = { size: 16, strokeWidth: 1.75, "aria-hidden": true } as const;
 
 export function SiteHeader() {
   const theme = useTheme();
+  const router = useRouter();
   // undefined while loading, so the link does not flash "Sign in" for signed-in runners.
   const [me, setMe] = useState<Me | undefined>(undefined);
   useEffect(() => {
@@ -28,12 +35,25 @@ export function SiteHeader() {
         <Link href="/suggestion" className={styles.navLink}>
           Feedback
         </Link>
-        {me === undefined ? null : (
-          <Link href={me ? (me.admin ? "/admin" : "/my") : "/signin"} className={styles.navLink}>
-            {me ? (me.admin ? "Admin" : "My races") : "Sign in"}
+        <ThemeSwitch theme={theme} onThemeChange={setTheme} iconOnly label="Switch theme" />
+        {me === undefined ? null : me ? (
+          <UserMenu
+            user={me}
+            showTheme={false}
+            items={[
+              me.admin
+                ? { label: "Admin", icon: <ShieldCheck {...icon} />, onSelect: () => router.push("/admin") }
+                : { label: "My races", icon: <Flag {...icon} />, onSelect: () => router.push("/my") },
+              { label: "Heart rate zones", icon: <HeartPulse {...icon} />, onSelect: () => router.push("/settings#heart-rate-zones") },
+              { label: "Settings", icon: <Settings {...icon} />, onSelect: () => router.push("/settings") },
+            ]}
+            onSignOut={() => logout()}
+          />
+        ) : (
+          <Link href="/signin" className={styles.navLink}>
+            Sign in
           </Link>
         )}
-        <ThemeSwitch theme={theme} onThemeChange={setTheme} iconOnly label="Switch theme" />
       </div>
     </header>
   );

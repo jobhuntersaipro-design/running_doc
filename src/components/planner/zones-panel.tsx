@@ -8,14 +8,14 @@ import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import {
-  estimateThresholdPace,
+  HR_ZONE_NAMES,
   formatClock,
   formatPace,
   hrZones,
+  maxHrFromAge,
   parseDuration,
   type CourseZones,
   type HrSettings,
-  type Plan,
   type ZoneSettings,
 } from "@/lib/planner";
 import { useZoneSettings } from "./zone-settings";
@@ -56,12 +56,10 @@ interface ZoneRow {
 }
 
 export function ZonesPanel({
-  plan,
   zones,
   settings,
   onSettingsChange,
 }: {
-  plan: Plan;
   zones: CourseZones;
   settings: ZoneSettings;
   onSettingsChange: (next: ZoneSettings) => void;
@@ -70,31 +68,17 @@ export function ZonesPanel({
   const hr = settings.hr;
   const { dirty, account, save, discard } = useZoneSettings();
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
-  const [ageText, setAgeText] = useState("");
-  const age = Number(ageText);
-  // Tanaka's formula (208 - 0.7 x age) is closer than 220 - age for most adults.
-  const ageMax = age >= 12 && age <= 90 ? Math.round(208 - 0.7 * age) : null;
-  const unordered = hr.method === "custom" && hr.customStarts.some((v, i) => i > 0 && v <= hr.customStarts[i - 1]);
+  const unordered = outOfOrder(hr);
 
   async function saveZones() {
     setSaveState("saving");
     setSaveState((await save()) ? "saved" : "failed");
   }
   const [paceDraft, setPaceDraft] = useState<string | null>(null);
-  const estimate = estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
+  const estimate = zones.thresholdEstimate;
+  const estimateFrom = zones.thresholdEstimateFrom === "vo2max" ? "your VO2 max" : "your goal";
   const paceText = paceDraft ?? (settings.thresholdPace === null ? "" : formatPace(settings.thresholdPace));
   const paceError = paceDraft && paceDraft.trim() && parsePace(paceDraft) === null ? "Enter a pace as m:ss per km, between 2:30 and 10:00." : undefined;
-
-  const setHr = (patch: Partial<HrSettings>) => onSettingsChange({ ...settings, hr: { ...hr, ...patch } });
-
-  function changeMethod(method: string) {
-    const next = method as HrSettings["method"];
-    // Start custom zones from the ones currently shown, so the runner edits rather than starts over.
-    if (next === "custom" && hr.method !== "custom") {
-      const starts = hrZones(hr).map((z) => z.min) as HrSettings["customStarts"];
-      setHr({ method: next, customStarts: starts });
-    } else setHr({ method: next });
-  }
 
   function changePace(text: string) {
     setPaceDraft(text);
@@ -130,75 +114,14 @@ export function ZonesPanel({
           rows={hrRows}
           settingsLabel={`Max ${hr.maxHr} bpm, resting ${hr.restingHr} bpm, ${METHOD_NAME[hr.method]}`}
         >
-          <div className={styles.fieldRow}>
-            <NumberField
-              label="Max heart rate"
-              value={hr.maxHr}
-              min={120}
-              max={230}
-              suffix=" bpm"
-              onValueChange={(v) => setHr({ maxHr: v })}
-              description="From a hard race or field test. 220 minus age is only a rough guess."
-            />
-            <NumberField
-              label="Resting heart rate"
-              value={hr.restingHr}
-              min={30}
-              max={110}
-              suffix=" bpm"
-              onValueChange={(v) => setHr({ restingHr: v })}
-              description="Measured lying down, first thing in the morning."
-            />
-          </div>
-          <div className={styles.ageEstimate}>
-            <Input
-              label="Your age"
-              description="Not sure of your max? Enter your age for an estimate."
-              inputMode="numeric"
-              autoComplete="off"
-              value={ageText}
-              onChange={(e) => setAgeText(e.target.value.replace(/\D/g, "").slice(0, 2))}
-            />
-            {ageMax ? (
-              <Button variant="secondary" size="sm" onClick={() => setHr({ maxHr: ageMax })} disabled={ageMax === hr.maxHr}>
-                {ageMax === hr.maxHr ? `Using ${ageMax} bpm` : `Use ${ageMax} bpm`}
-              </Button>
-            ) : null}
-          </div>
-          <SegmentedControl label="Zone method" value={hr.method} onValueChange={changeMethod} options={METHODS} />
-          <p className={styles.muted}>{METHOD_HELP[hr.method]}</p>
-          {hr.method === "custom" ? (
-            <ol className={styles.customZones}>
-              {hr.customStarts.map((start, i) => (
-                <li key={i} className={styles[`zone${i + 1}`]}>
-                  <span className={styles.zoneChip} aria-hidden="true">
-                    Z{i + 1}
-                  </span>
-                  <NumberField
-                    label={`Zone ${i + 1}, ${zones.hrZones[i].name.toLowerCase()}, starts at`}
-                    value={start}
-                    min={60}
-                    max={hr.maxHr}
-                    suffix=" bpm"
-                    onValueChange={(v) => {
-                      const next = [...hr.customStarts] as HrSettings["customStarts"];
-                      next[i] = v;
-                      setHr({ customStarts: next });
-                    }}
-                  />
-                  <span className={styles.muted}>to {i < 4 ? hr.customStarts[i + 1] - 1 : hr.maxHr} bpm</span>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-          {unordered ? <p className={styles.fieldError}>Each zone has to start higher than the one before it.</p> : null}
+          <HrZoneFields hr={hr} onChange={(next) => onSettingsChange({ ...settings, hr: next })} />
         </ZoneSection>
 
         <ZoneSection
           id="pace-zones"
           title="Pace zones"
           rows={paceRows}
-          settingsLabel={`Threshold ${formatPace(zones.thresholdPace)}/km${zones.thresholdEstimated ? ", estimated from your goal" : ""}`}
+          settingsLabel={`Threshold ${formatPace(zones.thresholdPace)}/km${zones.thresholdSet ? "" : `, estimated from ${estimateFrom}`}`}
         >
           <Input
             label="Threshold pace per km"
@@ -209,7 +132,7 @@ export function ZonesPanel({
             error={paceError}
             inputMode="numeric"
             autoComplete="off"
-            description={`The pace you could race for about an hour. Leave it empty to use ${formatPace(estimate)}/km, estimated from your goal. Zones follow Joe Friel's run pace zones.`}
+            description={`The pace you could race for about an hour. Leave it empty to use ${formatPace(estimate)}/km, estimated from ${estimateFrom}. Zones follow Joe Friel's run pace zones.`}
           />
           {settings.thresholdPace !== null ? (
             <div>
@@ -221,7 +144,7 @@ export function ZonesPanel({
                   onSettingsChange({ ...settings, thresholdPace: null });
                 }}
               >
-                Use the estimate from my goal
+                Use the estimate from {estimateFrom.replace("your", "my")}
               </Button>
             </div>
           ) : null}
@@ -264,6 +187,98 @@ export function ZonesPanel({
         pace. Race heart rates are estimates from typical effort for your goal time; heat, fitness and the day change them.
       </p>
     </div>
+  );
+}
+
+/** Whether custom zone starts are out of order. */
+export const outOfOrder = (hr: HrSettings) => hr.method === "custom" && hr.customStarts.some((v, i) => i > 0 && v <= hr.customStarts[i - 1]);
+
+/**
+ * Max and resting heart rate, the zone method and custom zone starts. On race plans and in Settings, where the
+ * profile's age replaces the age estimate.
+ */
+export function HrZoneFields({ hr, onChange, ageEstimate = true }: { hr: HrSettings; onChange: (hr: HrSettings) => void; ageEstimate?: boolean }) {
+  const [ageText, setAgeText] = useState("");
+  const age = Number(ageText);
+  const ageMax = age >= 12 && age <= 90 ? maxHrFromAge(age, null) : null;
+  const set = (patch: Partial<HrSettings>) => onChange({ ...hr, ...patch });
+
+  function changeMethod(method: string) {
+    const next = method as HrSettings["method"];
+    // Start custom zones from the ones currently shown, so the runner edits rather than starts over.
+    if (next === "custom" && hr.method !== "custom") {
+      const starts = hrZones(hr).map((z) => z.min) as HrSettings["customStarts"];
+      set({ method: next, customStarts: starts });
+    } else set({ method: next });
+  }
+
+  return (
+    <>
+      <div className={styles.fieldRow}>
+        <NumberField
+          label="Max heart rate"
+          value={hr.maxHr}
+          min={120}
+          max={230}
+          suffix=" bpm"
+          onValueChange={(v) => set({ maxHr: v })}
+          description="From a hard race or field test. 220 minus age is only a rough guess."
+        />
+        <NumberField
+          label="Resting heart rate"
+          value={hr.restingHr}
+          min={30}
+          max={110}
+          suffix=" bpm"
+          onValueChange={(v) => set({ restingHr: v })}
+          description="Measured lying down, first thing in the morning."
+        />
+      </div>
+      {ageEstimate ? (
+        <div className={styles.ageEstimate}>
+          <Input
+            label="Your age"
+            description="Not sure of your max? Enter your age for an estimate."
+            inputMode="numeric"
+            autoComplete="off"
+            value={ageText}
+            onChange={(e) => setAgeText(e.target.value.replace(/\D/g, "").slice(0, 2))}
+          />
+          {ageMax ? (
+            <Button variant="secondary" size="sm" onClick={() => set({ maxHr: ageMax })} disabled={ageMax === hr.maxHr}>
+              {ageMax === hr.maxHr ? `Using ${ageMax} bpm` : `Use ${ageMax} bpm`}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      <SegmentedControl label="Zone method" value={hr.method} onValueChange={changeMethod} options={METHODS} />
+      <p className={styles.muted}>{METHOD_HELP[hr.method]}</p>
+      {hr.method === "custom" ? (
+        <ol className={styles.customZones}>
+          {hr.customStarts.map((start, i) => (
+            <li key={i} className={styles[`zone${i + 1}`]}>
+              <span className={styles.zoneChip} aria-hidden="true">
+                Z{i + 1}
+              </span>
+              <NumberField
+                label={`Zone ${i + 1}, ${HR_ZONE_NAMES[i].toLowerCase()}, starts at`}
+                value={start}
+                min={60}
+                max={hr.maxHr}
+                suffix=" bpm"
+                onValueChange={(v) => {
+                  const next = [...hr.customStarts] as HrSettings["customStarts"];
+                  next[i] = v;
+                  set({ customStarts: next });
+                }}
+              />
+              <span className={styles.muted}>to {i < 4 ? hr.customStarts[i + 1] - 1 : hr.maxHr} bpm</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {outOfOrder(hr) ? <p className={styles.fieldError}>Each zone has to start higher than the one before it.</p> : null}
+    </>
   );
 }
 

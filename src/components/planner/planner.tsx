@@ -11,7 +11,7 @@ import { SiteHeader } from "@/components/site/site-header";
 import { useTheme } from "@/components/site/theme";
 import { TimePicker } from "@/components/arc/time-picker/time-picker";
 import type { CourseInput, RaceMeta } from "@/lib/courses/types";
-import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
+import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt, withProfile } from "@/lib/planner";
 import type { LinkPreview } from "@/lib/server/link-preview";
 import { CourseSetup } from "./course-setup";
 import { RaceResources } from "./race-resources";
@@ -20,6 +20,7 @@ import { FuelPlan } from "./fuel-plan";
 import { HillsTable } from "./hills-table";
 import { PaceBand } from "./pace-band";
 import { RaceRehearsal } from "./race-rehearsal";
+import { useRunnerProfile } from "./runner-profile";
 import { SplitsTable } from "./splits-table";
 import { clockAt } from "./util";
 import { WatchSetup } from "./watch-setup";
@@ -70,7 +71,9 @@ export function Planner({
   const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
-  const { settings: zoneSettings, preview: setZoneSettings } = useZoneSettings();
+  const { settings: savedZoneSettings, preview: setZoneSettings } = useZoneSettings();
+  const profile = useRunnerProfile();
+  const zoneSettings = useMemo(() => withProfile(savedZoneSettings, profile), [savedZoneSettings, profile]);
 
   const course: CourseInput | null = race ?? uploaded;
   const km = course?.officialKm ?? 21.0975;
@@ -93,7 +96,7 @@ export function Planner({
     });
   }, [course, goalSeconds]);
 
-  const zones = useMemo(() => (plan ? courseZones(plan, zoneSettings) : null), [plan, zoneSettings]);
+  const zones = useMemo(() => (plan ? courseZones(plan, zoneSettings, profile) : null), [plan, zoneSettings, profile]);
 
   function changeGoal(total: number) {
     // Minutes and seconds may step one past their range so 1:59 + 1 min rolls over to 2:00.
@@ -193,7 +196,7 @@ export function Planner({
 
           <FinishBenchmarks km={summary.totalKm} goalSeconds={summary.goalSeconds} />
 
-          <RaceRehearsal plan={plan} zones={zones} startTime={startTime} theme={theme} />
+          <RaceRehearsal plan={plan} zones={zones} startTime={startTime} theme={theme} profile={profile} />
 
           <Tabs value={tab} onValueChange={setTab} className={styles.tabs}>
             <TabsList aria-label="Plan details">
@@ -211,7 +214,7 @@ export function Planner({
               <HillsTable plan={plan} />
             </TabsContent>
             <TabsContent value="zones">
-              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} />
+              <ZonesPanel zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} />
             </TabsContent>
             <TabsContent value="fuel">
               <FuelPlan plan={plan} startTime={startTime} approximate={!!course.stationsApproximate} />

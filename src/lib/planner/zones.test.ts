@@ -87,7 +87,7 @@ describe("course zones", () => {
 
   it("uses a threshold pace the runner enters", () => {
     const own = courseZones(plan, { ...DEFAULT_ZONE_SETTINGS, thresholdPace: 300 });
-    expect(own.thresholdEstimated).toBe(false);
+    expect(own.thresholdSet).toBe(true);
     expect(own.thresholdPace).toBe(300);
     // Slower than goal pace, so a faster threshold puts most of the race in lower zones.
     expect(own.paceSeconds[2] + own.paceSeconds[1]).toBeGreaterThan(zones.paceSeconds[2] + zones.paceSeconds[1]);
