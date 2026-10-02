@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { Input } from "@/components/arc/input/input";
+import { NumberField } from "@/components/arc/number-field/number-field";
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
 import { SiteHeader } from "@/components/site/site-header";
@@ -40,18 +41,10 @@ function defaultGoalFor(km: number): string {
   return km > 40 ? "4:30:00" : km > 20 ? "1:59:00" : km > 9 ? "0:59:00" : "0:30:00";
 }
 
-function goalError(text: string, km: number): string | null {
-  let seconds: number;
-  try {
-    seconds = parseDuration(text.trim());
-  } catch {
-    return "Enter a time as h:mm:ss, for example 1:59:00.";
-  }
+function goalError(seconds: number, km: number): string | null {
   const pace = seconds / km;
-  if (!Number.isFinite(pace) || pace < MIN_PACE || pace > MAX_PACE) {
-    return `Enter a time between ${formatClock(MIN_PACE * km)} and ${formatClock(MAX_PACE * km)} for this distance.`;
-  }
-  return null;
+  if (Number.isFinite(pace) && pace >= MIN_PACE && pace <= MAX_PACE) return null;
+  return `Aim between ${formatClock(MIN_PACE * km)} and ${formatClock(MAX_PACE * km)} for this distance (${formatPace(MIN_PACE)} to ${formatPace(MAX_PACE)} per km).`;
 }
 
 /** A race from the overview: the course plus its event details. */
@@ -69,8 +62,11 @@ export function Planner({
   distances?: { id: string; label: string; current: boolean }[];
 }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
-  const [goalText, setGoalText] = useState(() => defaultGoalFor(race?.officialKm ?? 21.0975));
-  const [goalSeconds, setGoalSeconds] = useState(() => parseDuration(defaultGoalFor(race?.officialKm ?? 21.0975)));
+  // `draft` follows the controls; `goalSeconds` is the last in-range goal, which the plan uses.
+  const [draft, setDraft] = useState(() => parseDuration(defaultGoalFor(race?.officialKm ?? 21.0975)));
+  const [goalSeconds, setGoalSeconds] = useState(draft);
+  // What the runner is typing in the pace field; null shows the goal's pace.
+  const [paceText, setPaceText] = useState<string | null>(null);
   const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
@@ -78,7 +74,10 @@ export function Planner({
 
   const course: CourseInput | null = race ?? uploaded;
   const km = course?.officialKm ?? 21.0975;
-  const error = goalError(goalText, km);
+  const error = goalError(draft, km);
+  const goalH = Math.floor(draft / 3600);
+  const goalM = Math.floor((draft % 3600) / 60);
+  const goalS = draft % 60;
 
   const plan = useMemo(() => {
     if (!course) return null;
@@ -96,20 +95,25 @@ export function Planner({
 
   const zones = useMemo(() => (plan ? courseZones(plan, zoneSettings) : null), [plan, zoneSettings]);
 
-  function changeGoal(text: string) {
-    setGoalText(text);
-    if (!goalError(text, km)) setGoalSeconds(parseDuration(text.trim()));
+  function changeGoal(total: number) {
+    // Minutes and seconds may step one past their range so 1:59 + 1 min rolls over to 2:00.
+    const seconds = Math.min(Math.max(total, 0), 9 * 3600 + 59 * 60 + 59);
+    setDraft(seconds);
+    if (!goalError(seconds, km)) setGoalSeconds(seconds);
+  }
+
+  function changePace(text: string) {
+    setPaceText(text);
+    if (/^\d{1,2}:[0-5]\d$/.test(text.trim())) changeGoal(Math.round(parseDuration(text.trim()) * km));
   }
 
   function changeCourse(next: CourseInput | null) {
     setUploaded(next);
-    if (next && goalError(goalText, next.officialKm)) changeGoalFor(next.officialKm);
-  }
-
-  function changeGoalFor(distance: number) {
-    const text = defaultGoalFor(distance);
-    setGoalText(text);
-    setGoalSeconds(parseDuration(text));
+    if (next && goalError(draft, next.officialKm)) {
+      const seconds = parseDuration(defaultGoalFor(next.officialKm));
+      setDraft(seconds);
+      setGoalSeconds(seconds);
+    }
   }
 
   const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
@@ -153,25 +157,31 @@ export function Planner({
         <>
           <section className={styles.section} aria-labelledby="goal-heading">
             <h2 id="goal-heading" className={styles.h2}>Goal</h2>
+            <div className={styles.goalTime} role="group" aria-label="Goal finish time">
+              <NumberField label="Hours" size="sm" value={goalH} min={0} max={9} suffix=" h" onValueChange={(v) => changeGoal(v * 3600 + goalM * 60 + goalS)} />
+              <NumberField label="Minutes" size="sm" value={goalM} min={-1} max={60} suffix=" min" onValueChange={(v) => changeGoal(goalH * 3600 + v * 60 + goalS)} />
+              <NumberField label="Seconds" size="sm" value={goalS} min={-5} max={60} step={5} suffix=" s" onValueChange={(v) => changeGoal(goalH * 3600 + goalM * 60 + v)} />
+            </div>
+            <ChipGroup
+              label="Common goals"
+              multiple={false}
+              options={presets}
+              value={presets.some((p) => p.value === formatClock(draft)) ? [formatClock(draft)] : []}
+              onValueChange={(v) => v[0] && changeGoal(parseDuration(v[0]))}
+            />
             <div className={styles.goalGrid}>
               <Input
-                label="Goal finish time"
-                description="Hours, minutes and seconds, for example 1:59:00"
-                value={goalText}
-                onChange={(e) => changeGoal(e.target.value)}
+                label="Or aim for a pace"
+                description="Minutes and seconds per km, for example 5:40"
+                value={paceText ?? formatPace(draft / km)}
+                onChange={(e) => changePace(e.target.value)}
+                onBlur={() => setPaceText(null)}
                 error={error ?? undefined}
                 inputMode="numeric"
                 autoComplete="off"
               />
               <TimePicker label="Start time" value={startTime} onChange={setStartTime} format="12h" minuteStep={5} />
             </div>
-            <ChipGroup
-              label="Common goals"
-              multiple={false}
-              options={presets}
-              value={presets.some((p) => p.value === goalText) ? [goalText] : []}
-              onValueChange={(v) => v[0] && changeGoal(v[0])}
-            />
             <p className={styles.summary}>
               Average <span className={styles.num}>{formatPace(summary.goalPaceSecPerKm)}/km</span>. First half{" "}
               <span className={styles.num}>{formatClock(summary.firstHalfSeconds)}</span>, second half{" "}
