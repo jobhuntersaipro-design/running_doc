@@ -25,7 +25,12 @@ describe("suggestion box", () => {
     const shot = new File(["png bytes"], "shot.png", { type: "image/png" });
     expect(await sendSuggestion({}, form({ type: "Bug", text, email: "runner@example.com" }, [shot]))).toEqual({ sent: true });
     const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body).toMatchObject({ to: "jobhunters.ai.pro@gmail.com", reply_to: "runner@example.com", subject: `Running Doc Bug: ${text}` });
+    expect(body).toMatchObject({
+      from: "Running Doc Suggestions <running-doc-suggestions@kim-brothers.com>",
+      to: "jobhunters.ai.pro@gmail.com",
+      reply_to: "runner@example.com",
+      subject: `Running Doc Bug: ${text}`,
+    });
     expect(body.attachments).toEqual([{ filename: "shot.png", content: Buffer.from("png bytes").toString("base64") }]);
   });
 
@@ -39,6 +44,15 @@ describe("suggestion box", () => {
     expect((await sendSuggestion({}, form({ text }, [new File(["x"], "a.exe", { type: "application/x-msdownload" })]))).error).toBeTruthy();
     expect((await sendSuggestion({}, form({ text }, [img(), img(), img(), img()]))).error).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Resend's test sender when the kim-brothers.com sender is refused", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("domain not verified", { status: 403 })).mockResolvedValueOnce(new Response("{}"));
+    vi.stubGlobal("fetch", fetch);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await sendSuggestion({}, form({ type: "Bug", text }))).toEqual({ sent: true });
+    expect(JSON.parse(fetch.mock.calls[1][1].body).from).toBe("Running Doc <onboarding@resend.dev>");
   });
 
   it("asks runners to email directly when sending is not set up or fails", async () => {

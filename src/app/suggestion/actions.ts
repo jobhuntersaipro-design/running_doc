@@ -2,7 +2,7 @@
 
 import { emailReady, sendEmail } from "../../lib/server/email";
 import { LIMITS, formatMb } from "../admin/shared";
-import { MAX_IMAGES, SUGGESTION_EMAIL, SUGGESTION_TYPES, type SuggestionState } from "./shared";
+import { MAX_IMAGES, SUGGESTION_EMAIL, SUGGESTION_FROM, SUGGESTION_TYPES, type SuggestionState } from "./shared";
 
 /** Emails a runner's suggestion to the team, images attached. */
 // ponytail: no rate limit; Resend's daily quota caps a flood. Add a per-IP limit or captcha if spam arrives.
@@ -19,13 +19,15 @@ export async function sendSuggestion(_prev: SuggestionState, fd: FormData): Prom
     return { error: `Attach up to ${MAX_IMAGES} images, ${formatMb(LIMITS.total)} in total.` };
 
   if (!emailReady()) return { error: `Suggestions cannot be sent from here yet. Email ${SUGGESTION_EMAIL} instead.` };
-  const sent = await sendEmail({
+  const mail = {
     to: SUGGESTION_EMAIL,
     replyTo: email || undefined,
     subject: `Running Doc ${type}: ${text.split("\n")[0].slice(0, 60)}`,
     text: `${type}\n\n${text}\n\n${email ? `From: ${email}` : "No reply address given."}`,
     attachments: await Promise.all(images.map(async (f) => ({ filename: f.name, content: Buffer.from(await f.arrayBuffer()).toString("base64") }))),
-  });
+  };
+  // ponytail: retries from Resend's test sender while kim-brothers.com is unverified, so suggestions still arrive. Drop it once verified.
+  const sent = (await sendEmail({ ...mail, from: SUGGESTION_FROM })) || (await sendEmail(mail));
   if (!sent) return { error: `Your suggestion could not be sent. Try again, or email ${SUGGESTION_EMAIL}.` };
   return { sent: true };
 }

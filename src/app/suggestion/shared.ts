@@ -3,6 +3,7 @@ import type { FormState } from "../admin/shared";
 /** Shared by the suggestion form and the action that sends it. */
 
 export const SUGGESTION_EMAIL = "jobhunters.ai.pro@gmail.com";
+export const SUGGESTION_FROM = "Running Doc Suggestions <running-doc-suggestions@kim-brothers.com>";
 export const MAX_IMAGES = 3;
 
 export const SUGGESTION_TYPES = [
