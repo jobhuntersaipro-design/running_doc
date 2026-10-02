@@ -6,10 +6,17 @@
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--foreground);
   font-size: var(--text-lg);
   font-weight: 500;
   text-decoration: none;
+}
+
+.brandIcon {
+  border-radius: 7px;
 }
 
 .brand:hover {
