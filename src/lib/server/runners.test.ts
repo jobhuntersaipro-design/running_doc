@@ -7,7 +7,7 @@ vi.mock("@neondatabase/serverless", () => ({
     if (db.failNext-- > 0) throw new Error("network");
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     db.queries.push({ text, values });
-    return text.startsWith("select count") ? [{ n: 2 }] : [];
+    return text.startsWith("select") ? [{ email: "alex@gmail.com", name: "Alex Tan", signed_up_at: new Date("2026-10-02T08:05:00Z") }] : [];
   },
 }));
 
@@ -26,17 +26,18 @@ describe("runners", () => {
   });
 
   it("does nothing without a database", async () => {
-    const { recordSignIn, countRunners } = await load("");
+    const { recordSignIn, listRunners } = await load("");
     await recordSignIn("a@gmail.com", "A");
-    expect(await countRunners()).toBeNull();
+    expect(await listRunners()).toBeNull();
     expect(db.queries).toEqual([]);
   });
 
-  it("creates the table once, records sign-ins by lowercased email and counts them", async () => {
-    const { recordSignIn, countRunners } = await load("postgres://neon");
+  it("creates the table once, records sign-ins by lowercased email and lists runners newest first", async () => {
+    const { recordSignIn, listRunners } = await load("postgres://neon");
     await recordSignIn(" Alex@Gmail.com ", "Alex Tan");
     await recordSignIn("alex@gmail.com", "Alex Tan");
-    expect(await countRunners()).toBe(2);
+    expect(await listRunners()).toEqual([{ email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z" }]);
+    expect(db.queries.at(-1)?.text).toContain("order by signed_up_at desc");
     expect(db.queries.filter((q) => q.text.startsWith("create table")).length).toBe(1);
     expect(db.queries[1]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
     expect(db.queries[1].text).toContain("on conflict (email) do update");

@@ -31,10 +31,12 @@ export async function recordSignIn(email: string, name: string): Promise<void> {
     on conflict (email) do update set name = excluded.name, last_sign_in_at = now()`;
 }
 
-/** How many runners have signed up, or null without a database. */
-export async function countRunners(): Promise<number | null> {
+export type Runner = { email: string; name: string; signedUpAt: string };
+
+/** Every runner who has signed up, newest first, or null without a database. */
+export async function listRunners(): Promise<Runner[] | null> {
   const q = await db();
   if (!q) return null;
-  const [row] = await q`select count(*)::int as n from runners`;
-  return row.n as number;
+  const rows = await q`select email, name, signed_up_at from runners order by signed_up_at desc`;
+  return rows.map((r) => ({ email: r.email, name: r.name, signedUpAt: new Date(r.signed_up_at).toISOString() }));
 }
