@@ -1657,19 +1657,6 @@
   }
 }
 
-.zoneSignIn {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface-muted);
-  font-size: var(--text-sm);
-}
-
-.zoneSignIn a {
-  color: var(--foreground);
-  font-weight: 500;
-}
 
 /* Official website and route map previews in the race header */
 
@@ -2078,4 +2065,84 @@
   .resourceMedia[data-state="loading"] {
     animation: none;
   }
+}
+
+/* Zone settings: age estimate, custom zones as rows, and the save bar */
+
+.ageEstimate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.ageEstimate > :first-child {
+  flex: 1 1 180px;
+}
+
+.ageEstimate > button {
+  margin-bottom: 28px;
+}
+
+.customZones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.customZones > li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 200px) 1fr;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.customZones .zoneChip {
+  grid-area: auto;
+  margin-bottom: 4px;
+}
+
+.customZones > li > :last-child {
+  padding-bottom: var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.zoneSaveBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  font-size: var(--text-sm);
+}
+
+.zoneSaveBar p {
+  margin: 0;
+}
+
+.zoneSaveBar a {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* Unsaved changes stay in view while scrolling the zone settings. */
+.zoneSaveBar[data-dirty] {
+  position: sticky;
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  z-index: 5;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-floating);
 }

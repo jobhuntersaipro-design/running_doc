@@ -11,7 +11,8 @@ let cache: ZoneSettings | null = null;
 export type ZoneAccount = "unknown" | "signed-out" | "signed-in";
 let account: ZoneAccount = "unknown";
 let loading: Promise<void> | null = null;
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
+/** The last saved settings; `cache` runs ahead of it while the runner edits. */
+let persisted: ZoneSettings | null = null;
 
 function read(): ZoneSettings {
   if (cache) return cache;
@@ -21,6 +22,7 @@ function read(): ZoneSettings {
   } catch {
     cache = DEFAULT_ZONE_SETTINGS;
   }
+  persisted = cache;
   return cache;
 }
 
@@ -31,6 +33,7 @@ function subscribe(onChange: () => void) {
 
 function store(next: ZoneSettings) {
   cache = next;
+  persisted = next;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch {
@@ -57,19 +60,37 @@ function loadFromAccount() {
     .finally(() => listeners.forEach((l) => l()));
 }
 
-/** Zone settings: kept in this browser, and in the runner's account when signed in. The server render uses the defaults. */
-export function useZoneSettings(): [ZoneSettings, (next: ZoneSettings) => void, ZoneAccount] {
+const isDirty = () => cache !== null && persisted !== null && JSON.stringify(cache) !== JSON.stringify(persisted);
+
+/**
+ * Zone settings. Edits preview straight away everywhere (zones, map, charts)
+ * and are kept only when the runner saves: in this browser, and in their
+ * account when signed in. The server render uses the defaults.
+ */
+export function useZoneSettings() {
   const settings = useSyncExternalStore(subscribe, read, () => DEFAULT_ZONE_SETTINGS);
+  const dirty = useSyncExternalStore(subscribe, isDirty, () => false);
   const acct = useSyncExternalStore(subscribe, () => account, () => "unknown" as ZoneAccount);
   useEffect(loadFromAccount, []);
-  const save = (next: ZoneSettings) => {
-    store(next);
-    if (account !== "signed-in") return;
-    clearTimeout(saveTimer);
-    // Number fields change on every step; send the last value once the runner pauses.
-    saveTimer = setTimeout(() => {
-      fetch("/api/me/zones", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) }).catch(() => {});
-    }, 800);
+  return {
+    settings,
+    dirty,
+    account: acct,
+    preview(next: ZoneSettings) {
+      cache = next;
+      listeners.forEach((l) => l());
+    },
+    discard() {
+      cache = persisted;
+      listeners.forEach((l) => l());
+    },
+    /** Saves the current settings; resolves false if the account save failed (they are still kept in this browser). */
+    async save(): Promise<boolean> {
+      const next = read();
+      store(next);
+      if (account !== "signed-in") return true;
+      const res = await fetch("/api/me/zones", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) }).catch(() => null);
+      return Boolean(res?.ok);
+    },
   };
-  return [settings, save, acct];
 }
