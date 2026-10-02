@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExternalLink, FileDown } from "lucide-react";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { Input } from "@/components/arc/input/input";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
@@ -12,7 +11,9 @@ import { useTheme } from "@/components/site/theme";
 import { TimePicker } from "@/components/arc/time-picker/time-picker";
 import type { CourseInput, RaceMeta } from "@/lib/courses/types";
 import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt } from "@/lib/planner";
+import type { LinkPreview } from "@/lib/server/link-preview";
 import { CourseSetup } from "./course-setup";
+import { RaceResources } from "./race-resources";
 import { FinishBenchmarks } from "./finish-benchmarks";
 import { FuelPlan } from "./fuel-plan";
 import { HillsTable } from "./hills-table";
@@ -57,14 +58,14 @@ function goalError(text: string, km: number): string | null {
 export type PlannerRace = CourseInput & Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files">;
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
-export function Planner({ race }: { race: PlannerRace | null }) {
+export function Planner({ race, officialPreview }: { race: PlannerRace | null; officialPreview?: LinkPreview | null }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   const [goalText, setGoalText] = useState("1:59:00");
   const [goalSeconds, setGoalSeconds] = useState(parseDuration("1:59:00"));
   const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
-  const [zoneSettings, setZoneSettings] = useZoneSettings();
+  const [zoneSettings, setZoneSettings, zoneAccount] = useZoneSettings();
 
   const course: CourseInput | null = race ?? uploaded;
   const km = course?.officialKm ?? 21.0975;
@@ -127,22 +128,7 @@ export function Planner({ race }: { race: PlannerRace | null }) {
           </p>
         </div>
         {race ? (
-          <ul className={styles.raceLinks}>
-            <li>
-              <a href={race.officialUrl} target="_blank" rel="noreferrer" className={styles.raceLink}>
-                <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />
-                Official race website
-              </a>
-            </li>
-            {race.files.map((f) => (
-              <li key={f.href}>
-                <a href={f.href} download className={styles.raceLink}>
-                  <FileDown size={16} strokeWidth={1.75} aria-hidden="true" />
-                  {f.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+          <RaceResources officialUrl={race.officialUrl} files={race.files} preview={officialPreview ?? null} />
         ) : (
           <CourseSetup course={uploaded} onCourseChange={changeCourse} />
         )}
@@ -238,7 +224,7 @@ export function Planner({ race }: { race: PlannerRace | null }) {
               <HillsTable plan={plan} />
             </TabsContent>
             <TabsContent value="zones">
-              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} />
+              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} account={zoneAccount} />
             </TabsContent>
             <TabsContent value="fuel">
               <FuelPlan plan={plan} startTime={startTime} approximate={!!course.stationsApproximate} />

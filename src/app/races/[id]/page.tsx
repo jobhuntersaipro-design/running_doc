@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Planner } from "@/components/planner/planner";
 import { getRace } from "@/lib/courses";
 import { getUser } from "@/lib/server/auth";
+import { linkPreview } from "@/lib/server/link-preview";
 import { builtInGpx, canSee, getStoredRace, storedRaceForPlanner } from "@/lib/server/races";
 
 // Races added in /admin come from storage, so every race page renders on request.
@@ -21,10 +22,10 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
   if (id === "custom") return <Planner race={null} />;
   const race = getRace(id);
   if (race) {
-    const gpx = await builtInGpx(race);
-    return <Planner race={{ ...race, gpx }} />;
+    const [gpx, officialPreview] = await Promise.all([builtInGpx(race), linkPreview(race.officialUrl)]);
+    return <Planner race={{ ...race, gpx }} officialPreview={officialPreview} />;
   }
   const stored = await storedRaceForPlanner(id, await getUser()).catch(() => null);
   if (!stored) notFound();
-  return <Planner race={stored} />;
+  return <Planner race={stored} officialPreview={await linkPreview(stored.officialUrl)} />;
 }

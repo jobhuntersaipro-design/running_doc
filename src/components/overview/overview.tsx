@@ -10,6 +10,21 @@ export type RaceCardData = Pick<
   "id" | "event" | "category" | "dateLabel" | "location" | "startTime" | "officialUrl" | "files" | "km" | "gainM" | "drinkStops" | "preview" | "coverUrl" | "private"
 >;
 
+/** Overview tabs. A race lands in the tab whose distance is nearest its own (a 15K sits only under All). */
+export const DISTANCE_TABS = [
+  { value: "all", label: "All", min: 0, max: Infinity },
+  { value: "5k", label: "5K", min: 4, max: 6 },
+  { value: "10k", label: "10K", min: 8, max: 12 },
+  { value: "half", label: "Half marathon", min: 19, max: 23 },
+  { value: "full", label: "Marathon", min: 40, max: 45 },
+] as const;
+export type DistanceTab = (typeof DISTANCE_TABS)[number]["value"];
+
+const inTab = (km: number, tab: DistanceTab) => {
+  const t = DISTANCE_TABS.find((d) => d.value === tab)!;
+  return km >= t.min && km <= t.max;
+};
+
 function startLabel(hhmm?: string) {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(":").map(Number);
@@ -17,7 +32,9 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per race. Opening a card shows its full race plan. */
-export function Overview({ races, signedIn }: { races: RaceCardData[]; signedIn: boolean }) {
+export function Overview({ races: all, signedIn, tab }: { races: RaceCardData[]; signedIn: boolean; tab: DistanceTab }) {
+  const races = all.filter((r) => inTab(r.km, tab));
+  const tabLabel = DISTANCE_TABS.find((t) => t.value === tab)!.label;
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -32,7 +49,29 @@ export function Overview({ races, signedIn }: { races: RaceCardData[]; signedIn:
         </p>
       </section>
 
-      <ul className={styles.grid} aria-label="Races">
+      <nav className={styles.tabs} aria-label="Race distance">
+        {DISTANCE_TABS.map((t) => {
+          const count = all.filter((r) => inTab(r.km, t.value)).length;
+          return (
+            <Link
+              key={t.value}
+              href={t.value === "all" ? "/" : `/?distance=${t.value}`}
+              className={styles.tab}
+              aria-current={t.value === tab ? "page" : undefined}
+              scroll={false}
+            >
+              {t.label}
+              <span className={styles.tabCount}>{count}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {races.length === 0 ? (
+        <p className={styles.emptyTab}>No {tabLabel.toLowerCase()} races yet. Add yours below to get a full plan for it.</p>
+      ) : null}
+
+      <ul className={styles.grid} aria-label={tab === "all" ? "Races" : `${tabLabel} races`}>
         {races.map((r) => (
           <li key={r.id} className={styles.card}>
             <Link href={`/races/${r.id}`} className={styles.cardMain}>
