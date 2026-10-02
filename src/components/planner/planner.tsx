@@ -21,7 +21,6 @@ import { RaceResources } from "./race-resources";
 import { FinishBenchmarks } from "./finish-benchmarks";
 import { FuelPlan } from "./fuel-plan";
 import { HillsTable } from "./hills-table";
-import { PaceBand } from "./pace-band";
 import { RaceRehearsal } from "./race-rehearsal";
 import { useRunnerProfile } from "./runner-profile";
 import { SplitsTable } from "./splits-table";
@@ -267,7 +266,6 @@ export function Planner({
               <TabsTrigger value="zones">Zones</TabsTrigger>
               <TabsTrigger value="fuel">Fuel and water</TabsTrigger>
               <TabsTrigger value="watch">Watch setup</TabsTrigger>
-              <TabsTrigger value="band">Pace band</TabsTrigger>
             </TabsList>
             <TabsContent value="splits">
               <SplitsTable plan={plan} zones={zones} startTime={startTime} />
@@ -283,9 +281,6 @@ export function Planner({
             </TabsContent>
             <TabsContent value="watch">
               <WatchSetup plan={plan} goal={goalFields} />
-            </TabsContent>
-            <TabsContent value="band">
-              <PaceBand plan={plan} startTime={startTime} />
             </TabsContent>
           </Tabs>
         </>

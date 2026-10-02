@@ -9,7 +9,7 @@ const FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Hel
 const STEPS = [
   ["Add your race", "Upload the course GPX from the organiser, Strava or Garmin Connect, plus the route map if you have it. Only you can see your races."],
   ["Set your goal and zones", "Pick a goal finish time. Add your max and resting heart rate and threshold pace to see which parts of the course will feel hardest."],
-  ["Rehearse, then take it with you", "Replay the whole race on the map, then load the workout onto your Garmin, Coros or Apple Watch and print a pace band for your wrist."],
+  ["Rehearse, then take it with you", "Replay the whole race on the map, then load the workout onto your Garmin, Coros or Apple Watch."],
 ];
 
 /** The welcome email: a three-step setup checklist. `site` is the origin the runner signed in on. */

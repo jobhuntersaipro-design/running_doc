@@ -121,7 +121,7 @@ export function WatchSetup({ plan, goal }: { plan: Plan; goal: ReactNode }) {
             <li>Add a work step per block below. Set the goal to distance and the alert to a pace range.</li>
             <li>Name it and save. If asked, send it to your Apple Watch. It appears under Outdoor Run in the Workout app.</li>
             <li>
-              For a simpler setup, use a single pace alert around {goalPace}/km and rely on the pace band for the hills.
+              For a simpler setup, use a single pace alert around {goalPace}/km and use the Splits tab for the hills.
             </li>
             <li>Start the custom workout at the start line.</li>
           </ol>
@@ -140,7 +140,7 @@ export function WatchSetup({ plan, goal }: { plan: Plan; goal: ReactNode }) {
             Watches usually read long in a city. Tall buildings bend the GPS signal and you rarely run the perfect racing line,
             so expect to be 1 to 2% ahead of the official markers by the end.
           </li>
-          <li>Trust the race clock at each marker more than the watch distance. The pace band has the time to hit at every km.</li>
+          <li>Trust the race clock at each marker more than the watch distance. The Splits tab has the time to hit at every km.</li>
           <li>Show lap pace, race time and distance on the main screen. Charge the watch and sync it the day before.</li>
         </ul>
       </div>

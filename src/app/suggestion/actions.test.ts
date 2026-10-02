@@ -9,7 +9,7 @@ const form = (fields: Record<string, string>, images: File[] = []) => {
   for (const f of images) fd.append("images", f);
   return fd;
 };
-const text = "The pace band prints km 18 twice on my iPhone.";
+const text = "The splits table shows km 18 twice on my iPhone.";
 
 describe("suggestion box", () => {
   afterEach(() => {
