@@ -1567,6 +1567,21 @@
     background: var(--surface);
   }
 
+  /* While stuck, the bar is fixed instead (Chrome on Android drops sticky bars under its URL bar)
+     and an empty slot of the same height keeps its place in the rehearsal. */
+  .rehearsal[data-pinned] .controls {
+    position: fixed;
+    left: var(--bar-x);
+    width: var(--bar-width);
+    margin-inline: 0;
+  }
+
+  .rehearsal[data-pinned]::after {
+    content: "";
+    order: 7;
+    height: var(--bar-height);
+  }
+
   .controls .progress {
     flex-basis: 100%;
   }

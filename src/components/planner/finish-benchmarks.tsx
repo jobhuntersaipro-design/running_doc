@@ -170,29 +170,32 @@ function Distribution({ b, goalSeconds }: { b: FinishBenchmark; goalSeconds: num
         <span className={styles.num}>{pct(women)}%</span> of women {who}.
       </p>
 
-      <table className={styles.srOnly}>
-        <caption>Average {b.distance} finish time and the share your goal beats, by age group</caption>
-        <thead>
-          <tr>
-            <th scope="col">Age</th>
-            <th scope="col">Men</th>
-            <th scope="col">Women</th>
-          </tr>
-        </thead>
-        <tbody>
-          {b.ages.map((a) => (
-            <tr key={a.group}>
-              <th scope="row">{a.group}</th>
-              <td>
-                {formatClock(a.menSeconds)}, goal beats {pct(a.menSeconds)}%
-              </td>
-              <td>
-                {formatClock(a.womenSeconds)}, goal beats {pct(a.womenSeconds)}%
-              </td>
+      {/* The wrapper clips the table: a table box ignores width: 1px and would widen the page on phones. */}
+      <div className={styles.srOnly}>
+        <table>
+          <caption>Average {b.distance} finish time and the share your goal beats, by age group</caption>
+          <thead>
+            <tr>
+              <th scope="col">Age</th>
+              <th scope="col">Men</th>
+              <th scope="col">Women</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {b.ages.map((a) => (
+              <tr key={a.group}>
+                <th scope="row">{a.group}</th>
+                <td>
+                  {formatClock(a.menSeconds)}, goal beats {pct(a.menSeconds)}%
+                </td>
+                <td>
+                  {formatClock(a.womenSeconds)}, goal beats {pct(a.womenSeconds)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <p className={styles.muted}>
         The averages are real results; the curves around them are an estimate that assumes finish times spread by about{" "}

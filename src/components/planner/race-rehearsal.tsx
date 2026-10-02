@@ -56,6 +56,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const kmRef = useRef(0);
   const partListRef = useRef<HTMLOListElement>(null);
   const rootRef = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   // A new goal time means a new race plan: start the rehearsal again from the start line.
   const [goalSeen, setGoalSeen] = useState(plan.summary.goalSeconds);
   if (goalSeen !== plan.summary.goalSeconds) {
@@ -69,6 +70,36 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   useEffect(() => {
     kmRef.current = Math.min(km, total);
   }, [km, total]);
+
+  // Chrome on Android pushes a bottom-sticky bar off the screen while its URL bar is showing.
+  // So while the play bar would be stuck to the bottom, pin it with position: fixed instead.
+  useEffect(() => {
+    const root = rootRef.current;
+    const bar = barRef.current;
+    if (!root || !bar) return;
+    const update = () => {
+      const r = root.getBoundingClientRect();
+      const inset = root.clientTop + parseFloat(getComputedStyle(root).paddingTop);
+      const pin = r.top + inset <= innerHeight - bar.offsetHeight && r.bottom - inset > innerHeight;
+      if (pin === root.hasAttribute("data-pinned")) return;
+      root.style.setProperty("--bar-height", `${bar.offsetHeight}px`);
+      root.style.setProperty("--bar-x", `${r.left + root.clientLeft}px`);
+      root.style.setProperty("--bar-width", `${r.width - 2 * root.clientLeft}px`);
+      root.toggleAttribute("data-pinned", pin);
+    };
+    // A resize can change the bar's size and place, so measure it again in the flow.
+    const resize = () => {
+      root.removeAttribute("data-pinned");
+      update();
+    };
+    update();
+    addEventListener("scroll", update, { passive: true });
+    addEventListener("resize", resize);
+    return () => {
+      removeEventListener("scroll", update);
+      removeEventListener("resize", resize);
+    };
+  }, []);
 
   useEffect(() => {
     if (!playing) return;
@@ -225,7 +256,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
 
       </div>
 
-      <div className={styles.controls}>
+      <div className={styles.controls} ref={barRef}>
         <Button variant="primary" onClick={togglePlay}>
           {playing ? (
             <Pause size={16} strokeWidth={1.75} aria-hidden="true" />
