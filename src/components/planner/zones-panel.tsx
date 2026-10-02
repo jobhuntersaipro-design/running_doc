@@ -18,7 +18,7 @@ import {
   type Plan,
   type ZoneSettings,
 } from "@/lib/planner";
-import type { ZoneAccount } from "./zone-settings";
+import { useZoneSettings } from "./zone-settings";
 import styles from "./planner.module.css";
 
 const METHODS: { value: HrSettings["method"]; label: string }[] = [
@@ -60,17 +60,27 @@ export function ZonesPanel({
   zones,
   settings,
   onSettingsChange,
-  account,
 }: {
   plan: Plan;
   zones: CourseZones;
   settings: ZoneSettings;
   onSettingsChange: (next: ZoneSettings) => void;
-  account: ZoneAccount;
 }) {
   const pathname = usePathname();
-  const [paceDraft, setPaceDraft] = useState<string | null>(null);
   const hr = settings.hr;
+  const { dirty, account, save, discard } = useZoneSettings();
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [ageText, setAgeText] = useState("");
+  const age = Number(ageText);
+  // Tanaka's formula (208 - 0.7 x age) is closer than 220 - age for most adults.
+  const ageMax = age >= 12 && age <= 90 ? Math.round(208 - 0.7 * age) : null;
+  const unordered = hr.method === "custom" && hr.customStarts.some((v, i) => i > 0 && v <= hr.customStarts[i - 1]);
+
+  async function saveZones() {
+    setSaveState("saving");
+    setSaveState((await save()) ? "saved" : "failed");
+  }
+  const [paceDraft, setPaceDraft] = useState<string | null>(null);
   const estimate = estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
   const paceText = paceDraft ?? (settings.thresholdPace === null ? "" : formatPace(settings.thresholdPace));
   const paceError = paceDraft && paceDraft.trim() && parsePace(paceDraft) === null ? "Enter a pace as m:ss per km, between 2:30 and 10:00." : undefined;
@@ -140,27 +150,48 @@ export function ZonesPanel({
               description="Measured lying down, first thing in the morning."
             />
           </div>
+          <div className={styles.ageEstimate}>
+            <Input
+              label="Your age"
+              description="Not sure of your max? Enter your age for an estimate."
+              inputMode="numeric"
+              autoComplete="off"
+              value={ageText}
+              onChange={(e) => setAgeText(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            />
+            {ageMax ? (
+              <Button variant="secondary" size="sm" onClick={() => setHr({ maxHr: ageMax })} disabled={ageMax === hr.maxHr}>
+                {ageMax === hr.maxHr ? `Using ${ageMax} bpm` : `Use ${ageMax} bpm`}
+              </Button>
+            ) : null}
+          </div>
           <SegmentedControl label="Zone method" value={hr.method} onValueChange={changeMethod} options={METHODS} />
           <p className={styles.muted}>{METHOD_HELP[hr.method]}</p>
           {hr.method === "custom" ? (
-            <div className={styles.fieldRow}>
+            <ol className={styles.customZones}>
               {hr.customStarts.map((start, i) => (
-                <NumberField
-                  key={i}
-                  label={`Zone ${i + 1} starts at`}
-                  value={start}
-                  min={60}
-                  max={hr.maxHr}
-                  suffix=" bpm"
-                  onValueChange={(v) => {
-                    const next = [...hr.customStarts] as HrSettings["customStarts"];
-                    next[i] = v;
-                    setHr({ customStarts: next });
-                  }}
-                />
+                <li key={i} className={styles[`zone${i + 1}`]}>
+                  <span className={styles.zoneChip} aria-hidden="true">
+                    Z{i + 1}
+                  </span>
+                  <NumberField
+                    label={`Zone ${i + 1}, ${zones.hrZones[i].name.toLowerCase()}, starts at`}
+                    value={start}
+                    min={60}
+                    max={hr.maxHr}
+                    suffix=" bpm"
+                    onValueChange={(v) => {
+                      const next = [...hr.customStarts] as HrSettings["customStarts"];
+                      next[i] = v;
+                      setHr({ customStarts: next });
+                    }}
+                  />
+                  <span className={styles.muted}>to {i < 4 ? hr.customStarts[i + 1] - 1 : hr.maxHr} bpm</span>
+                </li>
               ))}
-            </div>
+            </ol>
           ) : null}
+          {unordered ? <p className={styles.fieldError}>Each zone has to start higher than the one before it.</p> : null}
         </ZoneSection>
 
         <ZoneSection
@@ -197,16 +228,39 @@ export function ZonesPanel({
         </ZoneSection>
       </div>
 
-      {account === "signed-out" ? (
-        <p className={styles.zoneSignIn}>
-          Your zones are only saved in this browser.{" "}
-          <Link href={`/signin?next=${encodeURIComponent(pathname)}`}>Sign in to save them to your account</Link> and use them on
-          any device.
+      <div className={styles.zoneSaveBar} data-dirty={dirty || undefined} role="status">
+        <p>
+          {dirty
+            ? "You have unsaved changes. The zones above already show them."
+            : saveState === "failed"
+              ? "Saved in this browser, but not to your account. Try again."
+              : saveState === "saved"
+                ? account === "signed-in"
+                  ? "Saved to your account."
+                  : "Saved in this browser."
+                : account === "signed-in"
+                  ? "Your zones are saved to your account."
+                  : "Your zones are saved in this browser."}{" "}
+          {account === "signed-out" ? (
+            <Link href={`/signin?next=${encodeURIComponent(pathname)}`}>Sign in to keep them on every device.</Link>
+          ) : null}
         </p>
-      ) : null}
+        {dirty || saveState === "failed" ? (
+          <div className={styles.inlineActions}>
+            {dirty ? (
+              <Button variant="ghost" size="sm" onClick={discard}>
+                Discard
+              </Button>
+            ) : null}
+            <Button size="sm" onClick={saveZones} loading={saveState === "saving"} disabled={unordered}>
+              Save zones
+            </Button>
+          </div>
+        ) : null}
+      </div>
 
       <p className={styles.hint}>
-        {account === "signed-in" ? "Your zones are saved to your account. " : ""}On uphills the pace zone drops while heart rate rises: hold the effort, not the
+        On uphills the pace zone drops while heart rate rises: hold the effort, not the
         pace. Race heart rates are estimates from typical effort for your goal time; heat, fitness and the day change them.
       </p>
     </div>

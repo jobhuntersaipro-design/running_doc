@@ -74,7 +74,7 @@ export function Planner({
   const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
-  const [zoneSettings, setZoneSettings, zoneAccount] = useZoneSettings();
+  const { settings: zoneSettings, preview: setZoneSettings } = useZoneSettings();
 
   const course: CourseInput | null = race ?? uploaded;
   const km = course?.officialKm ?? 21.0975;
@@ -201,7 +201,7 @@ export function Planner({
               <HillsTable plan={plan} />
             </TabsContent>
             <TabsContent value="zones">
-              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} account={zoneAccount} />
+              <ZonesPanel plan={plan} zones={zones} settings={zoneSettings} onSettingsChange={setZoneSettings} />
             </TabsContent>
             <TabsContent value="fuel">
               <FuelPlan plan={plan} startTime={startTime} approximate={!!course.stationsApproximate} />
