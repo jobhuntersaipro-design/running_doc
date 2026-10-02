@@ -5,19 +5,30 @@ import { SiteHeader } from "@/components/site/site-header";
 import { logout } from "@/app/admin/actions";
 import styles from "./admin.module.css";
 
-export function AdminShell({ children, signedIn = false, back = false }: { children: ReactNode; signedIn?: boolean; back?: boolean }) {
+export function AdminShell({
+  children,
+  signedIn = false,
+  back = false,
+  home = "/admin",
+}: {
+  children: ReactNode;
+  signedIn?: boolean;
+  back?: boolean;
+  /** "/admin" for the admin, "/my" for a runner's own races. */
+  home?: "/admin" | "/my";
+}) {
   return (
     <main className={styles.page}>
       <SiteHeader />
       {signedIn ? (
         <nav className={styles.bar} aria-label="Admin">
           {back ? (
-            <Link href="/admin" className={styles.ghostLink}>
+            <Link href={home} className={styles.ghostLink}>
               <ArrowLeft size={16} strokeWidth={1.75} aria-hidden="true" />
-              All races
+              {home === "/admin" ? "All races" : "My races"}
             </Link>
           ) : (
-            <span className={styles.barLabel}>Admin</span>
+            <span className={styles.barLabel}>{home === "/admin" ? "Admin" : "My races"}</span>
           )}
           <form action={logout}>
             <button type="submit" className={styles.ghostLink}>

@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getRace } from "@/lib/courses";
 import { parseGpx, type Station } from "@/lib/planner";
-import { endSession, isAdmin, startSession, verifyCredentials } from "@/lib/server/auth";
+import { endSession, getUser, isAdmin, startSession, verifyCredentials, type SessionUser } from "@/lib/server/auth";
 import {
   cardFacts,
   deleteRaceFiles,
   getCoverOverride,
   getStoredRace,
+  listRaces,
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
@@ -27,6 +28,17 @@ async function requireAdmin() {
   if (!(await isAdmin())) redirect("/admin");
 }
 
+async function requireUser(): Promise<SessionUser> {
+  const user = await getUser();
+  if (!user) redirect("/signin");
+  return user;
+}
+
+const owns = (user: SessionUser, race: StoredRace) => user.admin || race.owner?.toLowerCase() === user.email.toLowerCase();
+const homeOf = (user: SessionUser) => (user.admin ? "/admin" : "/my");
+/** ponytail: flat cap per runner, add quotas by storage size if R2 costs matter. */
+const MAX_RACES_PER_RUNNER = 20;
+
 function storageError(e: unknown): FormState {
   if (e instanceof StorageNotReadyError || e instanceof StorageError) return { error: e.message };
   console.error(e);
@@ -40,13 +52,13 @@ export async function login(_prev: FormState, fd: FormData): Promise<FormState> 
     await new Promise((r) => setTimeout(r, 800));
     return { error: "That email and password do not match." };
   }
-  await startSession();
+  await startSession({ email: text(fd, "email"), name: "Admin" });
   redirect("/admin");
 }
 
 export async function logout(): Promise<void> {
   await endSession();
-  redirect("/admin");
+  redirect("/");
 }
 
 const IMAGE_TYPES: Record<string, { ext: string; magic: (b: Buffer) => boolean }> = {
@@ -109,15 +121,17 @@ function parseStations(raw: string, km: number): Station[] | null {
 
 /** Creates a race, or updates one when the form carries an id. */
 export async function saveRace(_prev: FormState, fd: FormData): Promise<FormState> {
-  await requireAdmin();
+  const user = await requireUser();
   const editId = text(fd, "id");
   let existing: StoredRace | null = null;
   try {
     existing = editId ? await getStoredRace(editId) : null;
+    if (!editId && !user.admin && (await listRaces()).filter((r) => r.owner?.toLowerCase() === user.email.toLowerCase()).length >= MAX_RACES_PER_RUNNER)
+      return { error: `You can add up to ${MAX_RACES_PER_RUNNER} races. Delete one to add another.` };
   } catch (e) {
     return storageError(e);
   }
-  if (editId && !existing) return { error: "This race no longer exists." };
+  if (editId && (!existing || !owns(user, existing))) return { error: "This race no longer exists." };
 
   const fieldErrors: Record<string, string> = {};
   const event = text(fd, "event");
@@ -237,17 +251,18 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       pdfUrl,
       coverUrl,
       facts,
+      owner: existing ? existing.owner : user.admin ? undefined : user.email,
       updatedAt: Date.now(),
     };
     await saveRecord(record);
     await deleteFiles(replaced);
     revalidatePath("/");
     revalidatePath(`/races/${id}`);
-    revalidatePath("/admin");
+    revalidatePath(homeOf(user));
   } catch (e) {
     return storageError(e);
   }
-  redirect("/admin?saved=1");
+  redirect(`${homeOf(user)}?saved=1`);
 }
 
 /** Sets or removes the cover of a built-in race. */
@@ -278,15 +293,17 @@ export async function saveCover(_prev: FormState, fd: FormData): Promise<FormSta
 
 /** Deletes a race added in /admin, with its files. Built-in races live in the code and cannot be deleted here. */
 export async function deleteRace(id: string): Promise<FormState> {
-  await requireAdmin();
+  const user = await requireUser();
   if (getRace(id)) return { error: "Built-in races are part of the code and cannot be deleted here." };
   try {
+    const race = await getStoredRace(id);
+    if (!race || !owns(user, race)) return { error: "This race no longer exists." };
     await deleteRaceFiles(id);
   } catch (e) {
     return storageError(e);
   }
   revalidatePath("/");
   revalidatePath(`/races/${id}`);
-  revalidatePath("/admin");
+  revalidatePath(homeOf(user));
   return {};
 }

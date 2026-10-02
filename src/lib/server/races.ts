@@ -33,6 +33,8 @@ export interface StoredRace {
   pdfUrl?: string;
   coverUrl?: string;
   facts: CardFacts;
+  /** Email of the runner who added it. Their races are private to them; admin races have no owner and are public. */
+  owner?: string;
   updatedAt: number;
 }
 
@@ -60,7 +62,19 @@ export interface RaceCard extends CardFacts {
   km: number;
   coverUrl?: string;
   builtIn: boolean;
+  /** Added by a runner, so only they (and the admin) can see it. */
+  private: boolean;
+  owner?: string;
 }
+
+/** Who is looking: private races show only to their owner, or to the admin. */
+export interface Viewer {
+  email: string;
+  admin: boolean;
+}
+
+export const canSee = (r: StoredRace, viewer: Viewer | null) =>
+  !r.owner || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
 
 const recordKey = (id: string) => `races/${id}/race.json`;
 
@@ -106,6 +120,11 @@ export async function saveRecord(record: RaceRecord): Promise<void> {
   await deleteFiles(before.map((f) => f.url).filter((u) => u !== url));
 }
 
+/** Every race added in /admin or by runners. */
+export async function listRaces(): Promise<StoredRace[]> {
+  return [...(await loadRecords()).values()].filter((r): r is StoredRace => r.kind === "stored" && !getRace(r.id));
+}
+
 export async function getStoredRace(id: string): Promise<StoredRace | null> {
   const r = (await loadRecords()).get(id);
   return r?.kind === "stored" ? r : null;
@@ -134,7 +153,7 @@ export async function builtInGpx(race: RaceMeta): Promise<string> {
 }
 
 /** Every race for the overview, built-in and added in /admin, soonest first. */
-export async function overviewRaces(): Promise<RaceCard[]> {
+export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> {
   const records = await loadRecords().catch(() => new Map<string, RaceRecord>());
   const builtIn = await Promise.all(
     RACES.map(async (race): Promise<RaceCard> => {
@@ -153,11 +172,12 @@ export async function overviewRaces(): Promise<RaceCard[]> {
         km: race.officialKm,
         coverUrl: override?.kind === "cover" ? override.coverUrl : undefined,
         builtIn: true,
+        private: false,
       };
     }),
   );
   const stored = [...records.values()]
-    .filter((r): r is StoredRace => r.kind === "stored" && !getRace(r.id))
+    .filter((r): r is StoredRace => r.kind === "stored" && !getRace(r.id) && canSee(r, viewer))
     .map(
       (r): RaceCard => ({
         ...r.facts,
@@ -173,15 +193,17 @@ export async function overviewRaces(): Promise<RaceCard[]> {
         km: r.officialKm,
         coverUrl: r.coverUrl,
         builtIn: false,
+        private: Boolean(r.owner),
+        owner: r.owner,
       }),
     );
   return [...builtIn, ...stored].sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
 }
 
 /** A stored race in the shape the planner page needs, with its GPX loaded. */
-export async function storedRaceForPlanner(id: string) {
+export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
   const r = await getStoredRace(id);
-  if (!r) return null;
+  if (!r || !canSee(r, viewer)) return null;
   const gpx = await readText(r.gpxUrl);
   return {
     id: r.id,

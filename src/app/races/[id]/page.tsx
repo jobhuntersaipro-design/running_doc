@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Planner } from "@/components/planner/planner";
 import { getRace } from "@/lib/courses";
-import { builtInGpx, getStoredRace, storedRaceForPlanner } from "@/lib/server/races";
+import { getUser } from "@/lib/server/auth";
+import { builtInGpx, canSee, getStoredRace, storedRaceForPlanner } from "@/lib/server/races";
 
 // Races added in /admin come from storage, so every race page renders on request.
 export const dynamic = "force-dynamic";
@@ -10,7 +11,8 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata(props: PageProps<"/races/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   if (id === "custom") return { title: "Plan your own race" };
-  const event = getRace(id)?.event ?? (await getStoredRace(id).catch(() => null))?.event;
+  const stored = getRace(id) ? null : await getStoredRace(id).catch(() => null);
+  const event = getRace(id)?.event ?? (stored && canSee(stored, await getUser()) ? stored.event : undefined);
   return { title: event ? `${event}: race plan` : "Race not found" };
 }
 
@@ -22,7 +24,7 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
     const gpx = await builtInGpx(race);
     return <Planner race={{ ...race, gpx }} />;
   }
-  const stored = await storedRaceForPlanner(id).catch(() => null);
+  const stored = await storedRaceForPlanner(id, await getUser()).catch(() => null);
   if (!stored) notFound();
   return <Planner race={stored} />;
 }
