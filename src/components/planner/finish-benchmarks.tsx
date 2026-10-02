@@ -1,4 +1,8 @@
-import { benchmarkFor, formatClock, type FinishBenchmark } from "@/lib/planner";
+"use client";
+
+import { useState } from "react";
+import { ChipGroup } from "@/components/arc/chip-group/chip-group";
+import { FINISH_SPREAD, benchmarkFor, finishDensity, formatClock, shareSlowerThan, type FinishBenchmark } from "@/lib/planner";
 import styles from "./planner.module.css";
 
 function gap(goal: number, other: number): string {
@@ -52,7 +56,7 @@ export function FinishBenchmarks({ km, goalSeconds }: { km: number; goalSeconds:
         Your goal is {gap(goalSeconds, b.menSeconds)} the average man and {gap(goalSeconds, b.womenSeconds)} the average woman.
         These averages come from big-event results, not this race. Hot, humid or hilly races are usually slower.
       </p>
-      <AgeChart b={b} goalSeconds={goalSeconds} />
+      <Distribution b={b} goalSeconds={goalSeconds} />
     </section>
   );
 }
@@ -67,68 +71,84 @@ function ticks(lo: number, hi: number): number[] {
 
 const minutes = (s: number) => (s >= 3600 ? formatClock(s).replace(/:\d\d$/, "") : `${Math.round(s / 60)} min`);
 
+/** An SVG path tracing the density curve from x0 to x1, closed to the baseline when `area` is set. */
+function curve(mean: number, x0: number, x1: number, peak: number, area: boolean): string {
+  const pts: string[] = [];
+  for (let i = 0; i <= 120; i++) {
+    const t = x0 + ((x1 - x0) * i) / 120;
+    pts.push(`${((i / 120) * 1000).toFixed(1)},${(170 - (finishDensity(t, mean) / peak) * 160).toFixed(1)}`);
+  }
+  return `M${pts.join("L")}${area ? "L1000,170L0,170Z" : ""}`;
+}
+
 /**
- * Average finish time by age group as a dot plot: a row per age group, a dot
- * for men and a diamond for women, and a line at the runner's goal.
+ * How finish times spread for men and women in an age group, with the goal
+ * marked and the share of each group it beats.
  */
-function AgeChart({ b, goalSeconds }: { b: FinishBenchmark; goalSeconds: number }) {
-  const values = b.ages.flatMap((a) => [a.menSeconds, a.womenSeconds]).concat(goalSeconds);
-  const pad = (Math.max(...values) - Math.min(...values)) * 0.08 || 60;
-  const x0 = Math.min(...values) - pad;
-  const x1 = Math.max(...values) + pad;
+function Distribution({ b, goalSeconds }: { b: FinishBenchmark; goalSeconds: number }) {
+  const [group, setGroup] = useState("all");
+  const row = b.ages.find((a) => a.group === group);
+  const men = row?.menSeconds ?? b.menSeconds;
+  const women = row?.womenSeconds ?? b.womenSeconds;
+  const x0 = Math.min(men, women, goalSeconds) * 0.55;
+  const x1 = Math.max(men, women, goalSeconds) * 1.65;
+  // Both curves share one height scale, so the taller one is the narrower spread.
+  const peak = Math.max(finishDensity(men * 0.96, men), finishDensity(women * 0.96, women)) * 1.05;
   const pos = (s: number) => `${((s - x0) / (x1 - x0)) * 100}%`;
-  const beatsMen = b.ages.filter((a) => goalSeconds < a.menSeconds).length;
-  const beatsWomen = b.ages.filter((a) => goalSeconds < a.womenSeconds).length;
-  const of = (n: number) => (n === b.ages.length ? `all ${n}` : n === 0 ? "none" : `${n} of ${b.ages.length}`);
+  const pct = (mean: number) => Math.round(shareSlowerThan(goalSeconds, mean) * 100);
+  const who = row ? `aged ${row.group}` : "of all ages";
 
   return (
     <figure className={styles.ageChart}>
       <div className={styles.sectionHead}>
-        <figcaption className={styles.h3}>By age and gender</figcaption>
-        <a className={styles.sourceLink} href={b.agesSource.url} target="_blank" rel="noreferrer">
-          Source: {b.agesSource.name}
+        <figcaption className={styles.h3}>Finish-time distribution</figcaption>
+        <a className={styles.sourceLink} href={(row ? b.agesSource : b.source).url} target="_blank" rel="noreferrer">
+          Averages: {(row ? b.agesSource : b.source).name}
         </a>
       </div>
+      <ChipGroup
+        label="Age group"
+        multiple={false}
+        options={[{ value: "all", label: "All ages" }, ...b.ages.map((a) => ({ value: a.group, label: a.group }))]}
+        value={[group]}
+        onValueChange={(v) => setGroup(v[0] ?? "all")}
+      />
       <ul className={styles.ageLegend} aria-hidden="true">
         <li>
-          <span className={styles.ageDot} data-kind="men" /> Men
+          <span className={styles.distKey} data-kind="men" /> Men, average {formatClock(men)}
         </li>
         <li>
-          <span className={styles.ageDot} data-kind="women" /> Women
+          <span className={styles.distKey} data-kind="women" /> Women, average {formatClock(women)}
         </li>
         <li>
           <span className={styles.ageGoalKey} /> Your goal, {formatClock(goalSeconds)}
         </li>
       </ul>
 
-      <div className={styles.agePlot} aria-hidden="true">
-        {b.ages.map((a) => (
-          <div key={a.group} className={styles.ageRow} tabIndex={0}>
-            <span className={styles.ageLabel}>{a.group}</span>
-            <span className={styles.ageTrack}>
-              <span className={styles.ageGoal} style={{ left: pos(goalSeconds) }} />
-              <span className={styles.ageDot} data-kind="men" style={{ left: pos(a.menSeconds) }} />
-              <span className={styles.ageDot} data-kind="women" style={{ left: pos(a.womenSeconds) }} />
-              <span className={styles.ageTip}>
-                {a.group}: men {formatClock(a.menSeconds)}, women {formatClock(a.womenSeconds)}
-              </span>
+      <div className={styles.distPlot} aria-hidden="true">
+        <svg viewBox="0 0 1000 170" preserveAspectRatio="none">
+          <path d={curve(women, x0, x1, peak, true)} className={styles.distArea} data-kind="women" />
+          <path d={curve(men, x0, x1, peak, true)} className={styles.distArea} data-kind="men" />
+          <path d={curve(women, x0, x1, peak, false)} className={styles.distLine} data-kind="women" />
+          <path d={curve(men, x0, x1, peak, false)} className={styles.distLine} data-kind="men" />
+        </svg>
+        <span className={styles.distGoal} style={{ left: pos(goalSeconds) }} />
+        <div className={styles.distAxis}>
+          {ticks(x0, x1).map((v) => (
+            <span key={v} className={styles.ageTick} style={{ left: pos(v) }}>
+              {minutes(v)}
             </span>
-          </div>
-        ))}
-        <div className={styles.ageRow} data-axis="">
-          <span />
-          <span className={styles.ageTrack}>
-            {ticks(x0, x1).map((v) => (
-              <span key={v} className={styles.ageTick} style={{ left: pos(v) }}>
-                {minutes(v)}
-              </span>
-            ))}
-          </span>
+          ))}
         </div>
       </div>
 
+      <p className={styles.distResult}>
+        Your goal beats about <span className={styles.num}>{pct(men)}%</span> of men and{" "}
+        <span className={styles.num}>{pct(women)}%</span> of women {who}.
+      </p>
+
       <table className={styles.srOnly}>
-        <caption>Average {b.distance} finish time by age group</caption>
+        <caption>Average {b.distance} finish time and the share your goal beats, by age group</caption>
         <thead>
           <tr>
             <th scope="col">Age</th>
@@ -140,16 +160,20 @@ function AgeChart({ b, goalSeconds }: { b: FinishBenchmark; goalSeconds: number 
           {b.ages.map((a) => (
             <tr key={a.group}>
               <th scope="row">{a.group}</th>
-              <td>{formatClock(a.menSeconds)}</td>
-              <td>{formatClock(a.womenSeconds)}</td>
+              <td>
+                {formatClock(a.menSeconds)}, goal beats {pct(a.menSeconds)}%
+              </td>
+              <td>
+                {formatClock(a.womenSeconds)}, goal beats {pct(a.womenSeconds)}%
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
       <p className={styles.muted}>
-        Your goal is faster than the average man in {of(beatsMen)} age groups and the average woman in {of(beatsWomen)}. Tap a row
-        for its times. Fewer people run at the youngest and oldest ages, so those averages move more from year to year.
+        The averages are real results; the curves around them are an estimate that assumes finish times spread by about{" "}
+        {Math.round(FINISH_SPREAD * 100)}% either side, as they do at big city races. Read the percentages as a guide.
       </p>
     </figure>
   );

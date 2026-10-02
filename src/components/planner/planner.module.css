@@ -1162,9 +1162,10 @@
   color: var(--event);
 }
 
+/* Small and beside the runner, so the route just ahead stays visible. */
 .eventPin {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border: 2px solid var(--event);
   border-radius: 50%;
   background: var(--surface-raised);
@@ -1201,7 +1202,7 @@
 }
 
 .eventPin .drops {
-  bottom: 6px;
+  bottom: 3px;
 }
 
 .eventActive.event_drink .eventGlyph { animation: sip 1.6s ease-in-out infinite; }
@@ -1932,15 +1933,6 @@
   gap: var(--space-2);
 }
 
-.ageLegend .ageDot {
-  position: static;
-  transform: none;
-}
-
-.ageLegend .ageDot[data-kind="women"] {
-  transform: rotate(45deg) scale(0.85);
-}
-
 .ageGoalKey {
   width: 2px;
   height: 14px;
@@ -1948,97 +1940,66 @@
   background: var(--accent);
 }
 
-.agePlot {
-  display: grid;
+.distKey {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--men);
 }
 
-.ageRow {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-  min-height: 32px;
-  border-radius: var(--radius-control);
-  outline: none;
+.distKey[data-kind="women"] {
+  background: var(--women);
 }
 
-.ageRow:not([data-axis]):hover,
-.ageRow:not([data-axis]):focus {
-  background: var(--surface-muted);
-}
-
-.ageLabel {
-  padding-left: var(--space-2);
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.ageTrack {
+.distPlot {
   position: relative;
-  height: 32px;
-  margin-right: var(--space-3);
+  padding-bottom: 24px;
 }
 
-.ageTrack::before {
-  content: "";
-  position: absolute;
-  inset: 50% 0 auto;
-  height: 1px;
-  background: var(--border-subtle);
+.distPlot svg {
+  display: block;
+  width: 100%;
+  height: 170px;
+  border-bottom: 1px solid var(--border);
 }
 
-.ageRow[data-axis] .ageTrack::before {
-  display: none;
+.distArea {
+  fill: var(--men);
+  opacity: 0.14;
 }
 
-.ageGoal {
+.distArea[data-kind="women"] {
+  fill: var(--women);
+}
+
+.distLine {
+  fill: none;
+  stroke: var(--men);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.distLine[data-kind="women"] {
+  stroke: var(--women);
+  stroke-dasharray: 6 4;
+}
+
+.distGoal {
   position: absolute;
   top: 0;
-  bottom: 0;
+  height: 170px;
   width: 2px;
   margin-left: -1px;
   background: var(--accent);
 }
 
-.ageDot {
+.distAxis {
   position: absolute;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--men);
-  box-shadow: 0 0 0 2px var(--surface);
-  transform: translate(-50%, -50%);
+  inset: 170px 0 0;
 }
 
-.ageDot[data-kind="women"] {
-  border-radius: 2px;
-  background: var(--women);
-  transform: translate(-50%, -50%) rotate(45deg) scale(0.9);
-}
-
-.ageTip {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% - 4px);
-  z-index: 2;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  box-shadow: var(--shadow-resting);
-  color: var(--foreground);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--duration-fast) var(--ease-standard);
-}
-
-.ageRow:hover .ageTip,
-.ageRow:focus .ageTip {
-  opacity: 1;
+.distResult {
+  margin: 0;
 }
 
 .ageTick {

@@ -404,7 +404,7 @@ export default function RouteMap({
       eventMarkerRef.current?.remove();
       return;
     }
-    eventMarkerRef.current ??= new Marker({ element: eventEl, anchor: "bottom", offset: [0, -6] });
+    eventMarkerRef.current ??= new Marker({ element: eventEl, anchor: "bottom-left", offset: [10, -10] });
     eventMarkerRef.current.setLngLat(pointAt(plan.track, activeEvents[0].km)).addTo(map);
   }, [activeKey, styleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -436,7 +436,7 @@ export default function RouteMap({
             </div>
           ))}
         </dl>
-        {activeEvents.length ? createPortal(<EventIcon type={activeEvents[0].type} pin />, eventEl) : null}
+        {activeEvents.length ? createPortal(<EventIcon type={activeEvents[0].type} size={16} pin />, eventEl) : null}
         {failed ? (
           <p className={styles.mapNotice} role="status">
             {PROVIDER[mapStyle]} tiles could not load, so only the route shows. Try another style or check your connection.

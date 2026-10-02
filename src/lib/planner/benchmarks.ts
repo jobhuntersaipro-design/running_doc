@@ -106,3 +106,35 @@ export const FINISH_BENCHMARKS: FinishBenchmark[] = [
 export function benchmarkFor(km: number): FinishBenchmark | null {
   return FINISH_BENCHMARKS.find((b) => Math.abs(b.km - km) / b.km < 0.08) ?? null;
 }
+
+/**
+ * Finish times within a group are right-skewed, so they are modelled as a
+ * log-normal around the group's average. ponytail: the spread is an assumption
+ * (about 18% of the average, typical of big-city results), not measured per
+ * group; swap in real percentiles if a source publishes them.
+ */
+export const FINISH_SPREAD = 0.18;
+
+function erf(x: number): number {
+  // Abramowitz and Stegun 7.1.26, accurate to about 1e-7.
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return x >= 0 ? y : -y;
+}
+
+function logNormal(mean: number) {
+  const sigma = Math.sqrt(Math.log(1 + FINISH_SPREAD ** 2));
+  return { sigma, mu: Math.log(mean) - sigma ** 2 / 2 };
+}
+
+/** How common a finish time of `seconds` is in a group averaging `mean` (relative density). */
+export function finishDensity(seconds: number, mean: number): number {
+  const { mu, sigma } = logNormal(mean);
+  return Math.exp(-((Math.log(seconds) - mu) ** 2) / (2 * sigma ** 2)) / (seconds * sigma * Math.sqrt(2 * Math.PI));
+}
+
+/** Share of a group averaging `mean` that finishes slower than `seconds`, 0 to 1. */
+export function shareSlowerThan(seconds: number, mean: number): number {
+  const { mu, sigma } = logNormal(mean);
+  return 0.5 * (1 - erf((Math.log(seconds) - mu) / (sigma * Math.SQRT2)));
+}
