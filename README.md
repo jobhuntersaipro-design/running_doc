@@ -33,7 +33,7 @@ Copy `.env.example` to `.env.local` and fill it in. In production, set the same 
 
 - **Runner sign-in:** `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` from a Google OAuth client (Web application) whose authorized redirect URI is `<site>/api/auth/google/callback`. Signed-in runners add their own races at `/my`; those are visible only to them and the admin.
 - **Admin login:** `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH` (make it with `node scripts/hash-password.mjs`) and `AUTH_SECRET` (any long random string). The password itself is never stored.
-- **Suggestion box:** `RESEND_API_KEY` from a [Resend](https://resend.com) account signed up with jobhunters.ai.pro@gmail.com. The `/suggestion` page emails each suggestion and its images there.
+- **Email:** `RESEND_API_KEY` from a [Resend](https://resend.com) account signed up with jobhunters.ai.pro@gmail.com. The `/suggestion` page emails each suggestion and its images there. Runners get a welcome email the first time they sign in with Google, which also needs `EMAIL_FROM` on a domain verified in Resend (e.g. `Running Doc <hello@running-doc.space>`).
 - **Cloudflare R2:** race details, GPX, PDFs and cover images go to an R2 bucket when the `R2_*` variables are set. Without them, files go to the gitignored `.data` folder, which works locally but not on Vercel.
 
 ## Run it

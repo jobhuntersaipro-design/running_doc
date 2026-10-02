@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sendSuggestion } from "./actions";
 
+vi.mock("server-only", () => ({}));
+
 const form = (fields: Record<string, string>, images: File[] = []) => {
   const fd = new FormData();
   for (const [k, v] of Object.entries(fields)) fd.set(k, v);

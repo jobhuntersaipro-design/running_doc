@@ -1,10 +1,8 @@
-import { createHash } from "node:crypto";
 import { isZoneSettings } from "@/lib/planner";
 import { getUser } from "@/lib/server/auth";
-import { listFiles, readText, saveFile } from "@/lib/server/store";
+import { listFiles, readText, saveFile, userKey } from "@/lib/server/store";
 
-/** One file per runner, named by a hash so emails never appear in storage paths. */
-const keyFor = (email: string) => `users/${createHash("sha256").update(email.trim().toLowerCase()).digest("hex")}/zones.json`;
+const keyFor = (email: string) => userKey(email, "zones.json");
 
 /** The signed-in runner's saved heart rate and pace zone settings. 401 when signed out. */
 export async function GET() {

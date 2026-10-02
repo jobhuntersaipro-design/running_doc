@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AwsClient } from "aws4fetch";
@@ -71,6 +72,10 @@ export function localPath(key: string): string | null {
   const full = path.resolve(DATA_DIR, key);
   return full.startsWith(DATA_DIR + path.sep) ? full : null;
 }
+
+/** A file in a runner's own folder, named by a hash so emails never appear in storage paths. */
+export const userKey = (email: string, file: string) =>
+  `users/${createHash("sha256").update(email.trim().toLowerCase()).digest("hex")}/${file}`;
 
 const encodeKey = (key: string) => key.split("/").map(encodeURIComponent).join("/");
 
