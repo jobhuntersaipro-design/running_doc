@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Planner } from "@/components/planner/planner";
 import { getRace } from "@/lib/courses";
 import { getUser } from "@/lib/server/auth";
+import { getGoals } from "@/lib/server/runners";
 import { linkPreview } from "@/lib/server/link-preview";
 import { distanceName } from "@/lib/courses/distance";
 import { builtInGpx, canSee, getStoredRace, groupByEvent, overviewRaces, storedRaceForPlanner, type Viewer } from "@/lib/server/races";
@@ -27,17 +28,32 @@ async function distancesOf(id: string, viewer: Viewer | null) {
   return races.map((r) => ({ id: r.id, label: clash(r.km) ? r.category : distanceName(r.km), current: r.id === id }));
 }
 
+/** The signed-in runner's saved goal for this race, if any. */
+async function savedGoalFor(id: string, email: string | undefined) {
+  if (!email) return null;
+  const goals = await getGoals(email).catch((e): Awaited<ReturnType<typeof getGoals>> => {
+    console.error("Reading saved goals failed:", e);
+    return {};
+  });
+  return goals[id] ?? null;
+}
+
 export default async function RacePage(props: PageProps<"/races/[id]">) {
   const { id } = await props.params;
   if (id === "custom") return <Planner race={null} />;
+  const user = await getUser();
   const race = getRace(id);
   if (race) {
-    const [gpx, officialPreview, distances] = await Promise.all([builtInGpx(race), linkPreview(race.officialUrl), distancesOf(id, await getUser())]);
-    return <Planner race={{ ...race, gpx }} officialPreview={officialPreview} distances={distances} />;
+    const [gpx, officialPreview, distances, savedGoal] = await Promise.all([
+      builtInGpx(race),
+      linkPreview(race.officialUrl),
+      distancesOf(id, user),
+      savedGoalFor(id, user?.email),
+    ]);
+    return <Planner race={{ ...race, gpx }} officialPreview={officialPreview} distances={distances} signedIn={!!user} savedGoal={savedGoal} />;
   }
-  const user = await getUser();
   const stored = await storedRaceForPlanner(id, user).catch(() => null);
   if (!stored) notFound();
-  const [officialPreview, distances] = await Promise.all([linkPreview(stored.officialUrl), distancesOf(id, user)]);
-  return <Planner race={stored} officialPreview={officialPreview} distances={distances} />;
+  const [officialPreview, distances, savedGoal] = await Promise.all([linkPreview(stored.officialUrl), distancesOf(id, user), savedGoalFor(id, user?.email)]);
+  return <Planner race={stored} officialPreview={officialPreview} distances={distances} signedIn={!!user} savedGoal={savedGoal} />;
 }

@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const db = vi.hoisted(() => ({ queries: [] as { text: string; values: unknown[] }[], failNext: 0, profile: null as unknown }));
+const db = vi.hoisted(() => ({ queries: [] as { text: string; values: unknown[] }[], failNext: 0, profile: null as unknown, goals: {} as unknown }));
 vi.mock("@neondatabase/serverless", () => ({
   neon: () => async (strings: TemplateStringsArray, ...values: unknown[]) => {
     if (db.failNext-- > 0) throw new Error("network");
     const text = strings.join("?").replace(/\s+/g, " ").trim();
     db.queries.push({ text, values });
     if (text.startsWith("select profile")) return [{ profile: db.profile }];
+    if (text.startsWith("select goals")) return [{ goals: db.goals }];
     return text.startsWith("select") ? [{ email: "alex@gmail.com", name: "Alex Tan", signed_up_at: new Date("2026-10-02T08:05:00Z") }] : [];
   },
 }));
@@ -25,6 +26,7 @@ describe("runners", () => {
     db.queries = [];
     db.failNext = 0;
     db.profile = null;
+    db.goals = {};
   });
 
   it("does nothing without a database", async () => {
@@ -41,8 +43,8 @@ describe("runners", () => {
     expect(await listRunners()).toEqual([{ email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z" }]);
     expect(db.queries.at(-1)?.text).toContain("order by signed_up_at desc");
     expect(db.queries.filter((q) => q.text.startsWith("create table")).length).toBe(1);
-    expect(db.queries[2]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
-    expect(db.queries[2].text).toContain("on conflict (email) do update");
+    expect(db.queries[3]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
+    expect(db.queries[3].text).toContain("on conflict (email) do update");
   });
 
   it("retries creating the table after a failure", async () => {
@@ -50,7 +52,7 @@ describe("runners", () => {
     db.failNext = 1;
     await expect(recordSignIn("a@gmail.com", "A")).rejects.toThrow("network");
     await recordSignIn("a@gmail.com", "A");
-    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "insert"]);
+    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "alter", "insert"]);
   });
 
   it("saves a profile as JSON and only returns a valid one", async () => {
@@ -62,5 +64,16 @@ describe("runners", () => {
     expect(await getProfile("alex@gmail.com")).toEqual(profile);
     db.profile = { age: "old" };
     expect(await getProfile("alex@gmail.com")).toBeNull();
+  });
+
+  it("merges a saved goal into the runner's goals and drops invalid ones when reading", async () => {
+    const { saveGoal, getGoals } = await load("postgres://neon");
+    const goal = { goalSeconds: 7140, startTime: "05:00", savedAt: "2026-10-02T08:00:00.000Z" };
+    expect(await saveGoal("Alex@Gmail.com", "Alex", "klscm-2026-hm", goal)).toBe(true);
+    const insert = db.queries.at(-1)!;
+    expect(insert.values).toEqual(["alex@gmail.com", "Alex", "klscm-2026-hm", JSON.stringify(goal)]);
+    expect(insert.text).toContain("goals = runners.goals || excluded.goals");
+    db.goals = { "klscm-2026-hm": goal, broken: { goalSeconds: "fast" } };
+    expect(await getGoals("alex@gmail.com")).toEqual({ "klscm-2026-hm": goal });
   });
 });

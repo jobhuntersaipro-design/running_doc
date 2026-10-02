@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ImagePlus, Pencil, Plus } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { DeleteRace } from "./delete-race";
@@ -23,6 +24,7 @@ export function RaceDashboard({
   saved,
   storage,
   empty,
+  children,
 }: {
   title: string;
   lede: string;
@@ -32,6 +34,8 @@ export function RaceDashboard({
   saved: boolean;
   storage: { ok: true } | { ok: false; error: string };
   empty?: string;
+  /** Shown under the heading, above the race list. */
+  children?: ReactNode;
 }) {
   return (
     <>
@@ -58,6 +62,8 @@ export function RaceDashboard({
           Vercel, redeploy.
         </Alert>
       ) : null}
+
+      {children}
 
       {races.length === 0 && empty ? <p className={styles.notice}>{empty}</p> : null}
 

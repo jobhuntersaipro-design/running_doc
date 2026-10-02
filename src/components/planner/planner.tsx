@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
+import { Button } from "@/components/arc/button/button";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
@@ -11,7 +13,8 @@ import { SiteHeader } from "@/components/site/site-header";
 import { useTheme } from "@/components/site/theme";
 import { TimePicker } from "@/components/arc/time-picker/time-picker";
 import type { CourseInput, RaceMeta } from "@/lib/courses/types";
-import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt, withProfile } from "@/lib/planner";
+import { buildPlan, courseZones, formatClock, formatPace, parseDuration, timeAt, withProfile, type SavedGoal } from "@/lib/planner";
+import { saveGoal } from "@/app/races/[id]/actions";
 import type { LinkPreview } from "@/lib/server/link-preview";
 import { CourseSetup } from "./course-setup";
 import { RaceResources } from "./race-resources";
@@ -56,19 +59,26 @@ export function Planner({
   race,
   officialPreview,
   distances = [],
+  signedIn = false,
+  savedGoal = null,
 }: {
   race: PlannerRace | null;
   officialPreview?: LinkPreview | null;
   /** Every distance of this race's event, for the tabs under the title. */
   distances?: { id: string; label: string; current: boolean }[];
+  signedIn?: boolean;
+  /** The signed-in runner's saved goal for this race; the plan opens on it. */
+  savedGoal?: SavedGoal | null;
 }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   // `draft` follows the controls; `goalSeconds` is the last in-range goal, which the plan uses.
-  const [draft, setDraft] = useState(() => parseDuration(defaultGoalFor(race?.officialKm ?? 21.0975)));
+  const [draft, setDraft] = useState(() => savedGoal?.goalSeconds ?? parseDuration(defaultGoalFor(race?.officialKm ?? 21.0975)));
   const [goalSeconds, setGoalSeconds] = useState(draft);
   // What the runner is typing in the pace field; null shows the goal's pace.
   const [paceText, setPaceText] = useState<string | null>(null);
-  const [startTime, setStartTime] = useState(race?.startTime ?? "06:00");
+  const [startTime, setStartTime] = useState(savedGoal?.startTime ?? race?.startTime ?? "06:00");
+  const [saved, setSaved] = useState(savedGoal);
+  const [saving, setSaving] = useState<{ busy: boolean; error?: string }>({ busy: false });
   const theme = useTheme();
   const [tab, setTab] = useState("splits");
   const { settings: savedZoneSettings, preview: setZoneSettings } = useZoneSettings();
@@ -117,6 +127,16 @@ export function Planner({
       setDraft(seconds);
       setGoalSeconds(seconds);
     }
+  }
+
+  const savedNow = saved !== null && saved.goalSeconds === goalSeconds && saved.startTime === startTime;
+
+  async function saveCurrentGoal() {
+    if (!race) return;
+    setSaving({ busy: true });
+    const result = await saveGoal(race.id, goalSeconds, startTime).catch(() => ({ error: "Your goal could not be saved. Try again in a moment.", saved: undefined }));
+    if (result.saved) setSaved(result.saved);
+    setSaving({ busy: false, error: result.error });
   }
 
   const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
@@ -192,6 +212,41 @@ export function Planner({
               <span className={styles.num}>{clockAt(startTime, summary.goalSeconds)}</span>.
               {cutoff && cutoffArrival ? ` You reach the km ${cutoff.km} cutoff around ${cutoffArrival}; it closes at ${cutoff.clock}.` : ""}
             </p>
+            {race ? (
+              <div className={styles.goalSave}>
+                {signedIn ? (
+                  <>
+                    <Button variant="secondary" size="sm" onClick={saveCurrentGoal} loading={saving.busy} disabled={savedNow || !!error}>
+                      {savedNow ? (
+                        <>
+                          <Check size={16} strokeWidth={1.75} aria-hidden="true" />
+                          Goal saved
+                        </>
+                      ) : saved ? (
+                        "Save this goal instead"
+                      ) : (
+                        "Save my goal"
+                      )}
+                    </Button>
+                    <p className={styles.muted} role="status">
+                      {saving.error ??
+                        (saved ? (
+                          <>
+                            Your saved goal is <span className={styles.num}>{formatClock(saved.goalSeconds)}</span>, starting{" "}
+                            {clockAt(saved.startTime, 0)}. It is in <Link href="/my">My races</Link> and opens here next time.
+                          </>
+                        ) : (
+                          "Save your goal and start time to your account. This plan opens on them next time, and they are listed in My races."
+                        ))}
+                    </p>
+                  </>
+                ) : (
+                  <p className={styles.muted}>
+                    <Link href={`/signin?next=${encodeURIComponent(`/races/${race.id}`)}`}>Sign in</Link> to save your goal for this race.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </section>
 
           <FinishBenchmarks km={summary.totalKm} goalSeconds={summary.goalSeconds} />

@@ -64,3 +64,25 @@ export function hrShareFromVo2Share(share: number): number {
 export function energyKcal(weightKg: number, km: number): number {
   return Math.round(weightKg * km);
 }
+
+/** A goal a runner saved for one race: finish time, start time and when they saved it. */
+export interface SavedGoal {
+  goalSeconds: number;
+  /** "HH:MM", 24 hour. */
+  startTime: string;
+  /** ISO date. */
+  savedAt: string;
+}
+
+/** Checks a saved goal read from storage or sent by a browser. */
+export function isSavedGoal(v: unknown): v is SavedGoal {
+  const g = v as SavedGoal;
+  return (
+    !!g &&
+    Number.isInteger(g.goalSeconds) &&
+    g.goalSeconds >= 600 &&
+    g.goalSeconds < 36000 &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(String(g.startTime)) &&
+    !Number.isNaN(Date.parse(String(g.savedAt)))
+  );
+}

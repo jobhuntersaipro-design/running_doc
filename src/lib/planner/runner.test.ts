@@ -9,6 +9,7 @@ import {
   formatPace,
   hrShareFromVo2Share,
   isRunnerProfile,
+  isSavedGoal,
   maxHrFromAge,
   thresholdFromVo2max,
   vo2maxShare,
@@ -64,5 +65,14 @@ describe("runner profile", () => {
 
   it("estimates energy at about 1 kcal per kg per km", () => {
     expect(energyKcal(60, 21.1)).toBe(1266);
+  });
+
+  it("accepts saved goals with a sane finish time and a 24 hour start time", () => {
+    const goal = { goalSeconds: 7140, startTime: "06:00", savedAt: "2026-10-02T08:00:00.000Z" };
+    expect(isSavedGoal(goal)).toBe(true);
+    expect(isSavedGoal({ ...goal, goalSeconds: 7140.5 })).toBe(false);
+    expect(isSavedGoal({ ...goal, goalSeconds: 60 })).toBe(false);
+    expect(isSavedGoal({ ...goal, startTime: "25:00" })).toBe(false);
+    expect(isSavedGoal({ ...goal, savedAt: "yesterday" })).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 import "server-only";
 import { neon } from "@neondatabase/serverless";
-import { isRunnerProfile, type RunnerProfile } from "../planner/runner";
+import { isRunnerProfile, isSavedGoal, type RunnerProfile, type SavedGoal } from "../planner/runner";
 
 /** Neon Postgres over HTTP, when DATABASE_URL is set. */
 const url = process.env.DATABASE_URL?.trim();
@@ -19,6 +19,7 @@ function db() {
     last_sign_in_at timestamptz not null default now()
   )`
     .then(() => sql`alter table runners add column if not exists profile jsonb`)
+    .then(() => sql`alter table runners add column if not exists goals jsonb not null default '{}'::jsonb`)
     .catch((e) => {
       ready = null;
       throw e;
@@ -60,5 +61,22 @@ export async function saveProfile(email: string, name: string, profile: RunnerPr
   if (!q) return false;
   await q`insert into runners (email, name, profile) values (${key(email)}, ${name}, ${JSON.stringify(profile)}::jsonb)
     on conflict (email) do update set profile = excluded.profile`;
+  return true;
+}
+
+/** A runner's saved goals by race id. Empty without a database. */
+export async function getGoals(email: string): Promise<Record<string, SavedGoal>> {
+  const q = await db();
+  if (!q) return {};
+  const [row] = await q`select goals from runners where email = ${key(email)}`;
+  return Object.fromEntries(Object.entries((row?.goals ?? {}) as Record<string, unknown>).filter((e): e is [string, SavedGoal] => isSavedGoal(e[1])));
+}
+
+/** Saves or replaces a runner's goal for one race. Resolves false without a database. */
+export async function saveGoal(email: string, name: string, raceId: string, goal: SavedGoal): Promise<boolean> {
+  const q = await db();
+  if (!q) return false;
+  await q`insert into runners (email, name, goals) values (${key(email)}, ${name}, jsonb_build_object(${raceId}::text, ${JSON.stringify(goal)}::jsonb))
+    on conflict (email) do update set goals = runners.goals || excluded.goals`;
   return true;
 }
