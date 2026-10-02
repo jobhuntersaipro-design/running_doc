@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { Input } from "@/components/arc/input/input";
-import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { Breadcrumb } from "@/components/arc/breadcrumb/breadcrumb";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
 import { SiteHeader } from "@/components/site/site-header";
@@ -58,7 +58,16 @@ function goalError(text: string, km: number): string | null {
 export type PlannerRace = CourseInput & Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files">;
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
-export function Planner({ race, officialPreview }: { race: PlannerRace | null; officialPreview?: LinkPreview | null }) {
+export function Planner({
+  race,
+  officialPreview,
+  distances = [],
+}: {
+  race: PlannerRace | null;
+  officialPreview?: LinkPreview | null;
+  /** Every distance of this race's event, for the tabs under the title. */
+  distances?: { id: string; label: string; current: boolean }[];
+}) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   const [goalText, setGoalText] = useState("1:59:00");
   const [goalSeconds, setGoalSeconds] = useState(parseDuration("1:59:00"));
@@ -105,9 +114,6 @@ export function Planner({ race, officialPreview }: { race: PlannerRace | null; o
 
   const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
   const summary = plan?.summary;
-  const gels = plan?.events.filter((e) => e.type === "gel") ?? [];
-  const drinks = plan?.events.filter((e) => e.type === "drink") ?? [];
-  const biggestUphill = plan?.hills.filter((h) => h.kind === "uphill").sort((a, b) => b.change - a.change)[0];
   const cutoff = course?.cutoff;
   const cutoffArrival = plan && cutoff ? clockAt(startTime, timeAt(plan.timeline, cutoff.km)) : null;
 
@@ -127,6 +133,15 @@ export function Planner({ race, officialPreview }: { race: PlannerRace | null; o
               : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
         </div>
+        {distances.length > 1 ? (
+          <nav className={styles.distanceTabs} aria-label="Race distance">
+            {distances.map((d) => (
+              <Link key={d.id} href={`/races/${d.id}`} className={styles.distanceTab} aria-current={d.current ? "page" : undefined}>
+                {d.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         {race ? (
           <RaceResources officialUrl={race.officialUrl} files={race.files} preview={officialPreview ?? null} />
         ) : (
@@ -167,44 +182,6 @@ export function Planner({ race, officialPreview }: { race: PlannerRace | null; o
           </section>
 
           <FinishBenchmarks km={summary.totalKm} goalSeconds={summary.goalSeconds} />
-
-          <dl className={styles.kpiStrip} aria-label="Plan at a glance">
-            <div>
-              <dt>Total uphill</dt>
-              <dd className={styles.num}>{Math.round(summary.totalGain)} m</dd>
-            </div>
-            <div>
-              <dt>Gels</dt>
-              <dd className={styles.num}>{gels.length}</dd>
-            </div>
-            <div>
-              <dt>Drink stops</dt>
-              <dd className={styles.num}>{drinks.length}</dd>
-            </div>
-          </dl>
-
-          <section className={styles.kpis} aria-label="Plan at a glance">
-            <MetricCard
-              label="Total uphill"
-              value={Math.round(summary.totalGain)}
-              suffix=" m"
-              context={
-                biggestUphill
-                  ? `Biggest is +${Math.round(biggestUphill.change)} m from km ${biggestUphill.startKm.toFixed(1)}`
-                  : "No real uphills on this course"
-              }
-            />
-            <MetricCard
-              label="Gels"
-              value={gels.length}
-              context={gels.length ? `First at km ${gels[0].km.toFixed(1)}, about ${formatClock(gels[0].elapsedSeconds)} in` : "Not needed at this pace"}
-            />
-            <MetricCard
-              label="Drink stations"
-              value={drinks.length}
-              context={drinks.length ? `First at km ${drinks[0].km.toFixed(1)}` : "Add stations to plan your drinks"}
-            />
-          </section>
 
           <RaceRehearsal plan={plan} zones={zones} startTime={startTime} theme={theme} />
 

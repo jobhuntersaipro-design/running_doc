@@ -5,14 +5,15 @@ import { AdminShell } from "@/components/admin/admin-shell";
 import { CoverForm } from "@/components/admin/cover-form";
 import { RaceForm } from "@/components/admin/race-form";
 import { getRace } from "@/lib/courses";
-import { isAdmin } from "@/lib/server/auth";
-import { getCoverOverride, getStoredRace, type CoverOverride, type StoredRace } from "@/lib/server/races";
+import { getUser } from "@/lib/server/auth";
+import { eventNames, getCoverOverride, getStoredRace, type CoverOverride, type StoredRace } from "@/lib/server/races";
 import { StorageError } from "@/lib/server/store";
 
 export const metadata: Metadata = { title: "Edit race", robots: { index: false, follow: false } };
 
 export default async function EditRacePage(props: PageProps<"/admin/races/[id]">) {
-  if (!(await isAdmin())) redirect("/admin");
+  const user = await getUser();
+  if (!user?.admin) redirect("/admin");
   const { id } = await props.params;
   const builtIn = getRace(id);
 
@@ -40,7 +41,7 @@ export default async function EditRacePage(props: PageProps<"/admin/races/[id]">
   if (record?.kind !== "stored") notFound();
   return (
     <AdminShell signedIn back>
-      <RaceForm race={record} />
+      <RaceForm race={record} events={await eventNames(user)} />
     </AdminShell>
   );
 }

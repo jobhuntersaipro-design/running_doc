@@ -13,6 +13,7 @@ import { Switch } from "@/components/arc/switch/switch";
 import type { Theme } from "@/components/arc/theme-switch/theme-switch";
 import { HR_ZONE_NAMES, PACE_ZONE_NAMES, averageHr, elevationAt, formatClock, formatPace, kmAtTime, timeAt, zoneAt, type CourseZones, type HillInfo, type Plan, type PlanEvent } from "@/lib/planner";
 import { ElevationChart } from "./elevation-chart";
+import { RaceStrategy } from "./race-strategy";
 import { EventIcon } from "./event-icon";
 import { ZoneChart } from "./zone-chart";
 import type { MapStyle } from "./route-map";
@@ -54,6 +55,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const [hover, setHover] = useState<number | null>(null);
   const kmRef = useRef(0);
   const partListRef = useRef<HTMLOListElement>(null);
+  const rootRef = useRef<HTMLElement>(null);
   // A new goal time means a new race plan: start the rehearsal again from the start line.
   const [goalSeen, setGoalSeen] = useState(plan.summary.goalSeconds);
   if (goalSeen !== plan.summary.goalSeconds) {
@@ -149,7 +151,7 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
   const playLabel = playing ? "Pause" : finished ? "Replay race" : stoppedAt !== null ? "Continue" : position > 0 ? "Resume" : "Play race";
 
   return (
-    <section className={styles.rehearsal} aria-labelledby="rehearsal-heading">
+    <section className={styles.rehearsal} aria-labelledby="rehearsal-heading" ref={rootRef}>
       <div className={styles.sectionHead}>
         <h2 id="rehearsal-heading" className={styles.h2}>Race rehearsal</h2>
         <div className={styles.playbackControl}>
@@ -332,6 +334,15 @@ export function RaceRehearsal({ plan, zones, startTime, theme }: { plan: Plan; z
             </AnimatePresence>
           </div>
       </div>
+
+      <RaceStrategy
+        plan={plan}
+        startTime={startTime}
+        onPick={(at) => {
+          scrub(at);
+          rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
 
       <section className={styles.parts} aria-labelledby="parts-heading">
         <h3 id="parts-heading" className={styles.h3}>

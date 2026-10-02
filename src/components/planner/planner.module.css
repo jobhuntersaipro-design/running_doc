@@ -116,17 +116,6 @@
   color: var(--foreground);
 }
 
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
-  align-items: stretch;
-}
-
-.kpis > * {
-  min-width: 0;
-}
-
 /* Course setup */
 
 .setup {
@@ -1422,10 +1411,6 @@
   display: none;
 }
 
-.kpiStrip {
-  display: none;
-}
-
 /* Keep the plan tabs reachable while reading a long tab. Arc's tab shell is the first child of the tabs root. */
 .tabs > :first-child {
   position: sticky;
@@ -1493,38 +1478,6 @@
     display: block;
   }
 
-  /* One compact row of three numbers instead of three tall cards */
-  .kpis {
-    display: none;
-  }
-
-  .kpiStrip {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-panel);
-  }
-
-  .kpiStrip > div {
-    padding: var(--space-3) var(--space-4);
-    min-width: 0;
-  }
-
-  .kpiStrip > div + div {
-    border-left: 1px solid var(--border-subtle);
-  }
-
-  .kpiStrip dt {
-    color: var(--text-secondary);
-    font-size: var(--text-xs);
-  }
-
-  .kpiStrip dd {
-    margin: 2px 0 0;
-    font-size: var(--text-xl);
-  }
-
   .fieldRow {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1589,6 +1542,7 @@
   .toolbar { order: 3; }
   .nowPanel { order: 4; }
   .charts { order: 5; }
+  .strategy { order: 6; }
   .parts { order: 6; }
   /* Last in the flow so position: sticky keeps it pinned to the bottom of the screen
      the whole time the rehearsal is in view. */
@@ -1799,4 +1753,300 @@
   overflow: hidden;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+}
+
+/* Distance tabs: each distance of the event is its own race page. */
+.distanceTabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.distanceTab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.distanceTab:hover {
+  color: var(--foreground);
+}
+
+.distanceTab[aria-current="page"] {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-resting);
+}
+
+/* Race strategy: every hill, gel and drink with its time, above the race in parts */
+
+.strategy {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.strategyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.strategyCol {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+}
+
+.strategyHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.strategyHead > span:last-child {
+  display: grid;
+}
+
+.strategyTitle {
+  font-weight: 500;
+}
+
+.strategyCount {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.strategyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.strategyList > li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.strategyItem {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.strategyItem:hover {
+  background: var(--surface-muted);
+}
+
+.strategyWhen,
+.strategyWhat {
+  display: grid;
+  min-width: 0;
+}
+
+.strategyClock,
+.strategyDetail {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.strategyItemTitle {
+  font-weight: 500;
+}
+
+/* Finish times by age and gender: a dot plot. Men are blue dots, women purple diamonds
+   (validated as a pair for colour blindness in light and dark), the goal a line. */
+
+.ageChart {
+  --men: #1f7dcf;
+  --women: #7128a5;
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+:global(:root[data-theme="dark"]) .ageChart,
+:global(:root[data-theme="dark"]) .benchmarks {
+  --men: #3d8fe0;
+  --women: #9c37be;
+}
+
+.benchmarks {
+  --men: #1f7dcf;
+  --women: #7128a5;
+}
+
+.benchDot[data-kind="men"] {
+  background: var(--men);
+}
+
+.benchDot[data-kind="women"] {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.9);
+  background: var(--women);
+}
+
+.ageLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.ageLegend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ageLegend .ageDot {
+  position: static;
+  transform: none;
+}
+
+.ageLegend .ageDot[data-kind="women"] {
+  transform: rotate(45deg) scale(0.85);
+}
+
+.ageGoalKey {
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.agePlot {
+  display: grid;
+}
+
+.ageRow {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  min-height: 32px;
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.ageRow:not([data-axis]):hover,
+.ageRow:not([data-axis]):focus {
+  background: var(--surface-muted);
+}
+
+.ageLabel {
+  padding-left: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.ageTrack {
+  position: relative;
+  height: 32px;
+  margin-right: var(--space-3);
+}
+
+.ageTrack::before {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.ageRow[data-axis] .ageTrack::before {
+  display: none;
+}
+
+.ageGoal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+}
+
+.ageDot {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--men);
+  box-shadow: 0 0 0 2px var(--surface);
+  transform: translate(-50%, -50%);
+}
+
+.ageDot[data-kind="women"] {
+  border-radius: 2px;
+  background: var(--women);
+  transform: translate(-50%, -50%) rotate(45deg) scale(0.9);
+}
+
+.ageTip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% - 4px);
+  z-index: 2;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.ageRow:hover .ageTip,
+.ageRow:focus .ageTip {
+  opacity: 1;
+}
+
+.ageTick {
+  position: absolute;
+  top: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
