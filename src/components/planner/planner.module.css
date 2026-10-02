@@ -882,17 +882,154 @@
   gap: var(--space-3);
 }
 
-.zoneBar {
-  display: block;
+.zoneSection {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.zoneSectionHead {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* The whole race as one bar, like a watch's time-in-zone summary. */
+.zoneStack {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.zoneStack > span {
+  display: grid;
+  place-items: center;
+  min-width: 4px;
+  background: var(--zone);
+  color: oklch(100% 0 0);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.zoneList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.zoneItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "chip text time"
+    "chip track track";
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+
+.zoneItem[data-empty] {
+  opacity: 0.55;
+}
+
+.zoneChip {
+  grid-area: chip;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: color-mix(in oklch, var(--zone) 20%, transparent);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.zoneText {
+  grid-area: text;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+}
+
+.zoneName {
+  font-weight: 500;
+}
+
+.zoneRange {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoneTime {
+  grid-area: time;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.zonePct {
+  min-width: 3ch;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.zoneTrack {
+  grid-area: track;
   height: 6px;
-  margin-top: var(--space-1);
+  border-radius: 3px;
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.zoneTrack > span {
+  display: block;
+  height: 100%;
   border-radius: 3px;
   background: var(--zone);
 }
 
-.zoneTableHead {
-  display: grid;
-  gap: var(--space-1);
+.zoneSettings {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+}
+
+.zoneSettings > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.zoneSettings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.zoneSettingsAction {
+  flex: none;
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.zoneSettings[open] .zoneSettingsAction {
+  color: var(--text-secondary);
+}
+
+.zoneSettings > .zoneForm {
+  padding-top: var(--space-3);
 }
 
 /* Rehearsal: playback label, stacked charts and race parts */

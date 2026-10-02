@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
@@ -24,9 +24,15 @@ const METHODS: { value: HrSettings["method"]; label: string }[] = [
   { value: "custom", label: "My own zones" },
 ];
 
+const METHOD_NAME: Record<HrSettings["method"], string> = {
+  max: "% of max",
+  reserve: "heart rate reserve",
+  custom: "your own zones",
+};
+
 const METHOD_HELP: Record<HrSettings["method"], string> = {
-  max: "Zones start at 50, 60, 70, 80 and 90% of your max heart rate.",
-  reserve: "Zones use the range between resting and max heart rate (Karvonen), which suits fitter runners with a low resting rate.",
+  max: "Zones start at 50, 60, 70, 80 and 90% of your max heart rate. The simplest choice.",
+  reserve: "Zones use the range between resting and max heart rate (Karvonen). Suits fitter runners with a low resting rate.",
   custom: "Enter where each zone starts, for example from your watch, a lab test or your coach.",
 };
 
@@ -37,6 +43,13 @@ function parsePace(text: string): number | null {
   } catch {
     return null;
   }
+}
+
+interface ZoneRow {
+  zone: number;
+  name: string;
+  range: string;
+  seconds: number;
 }
 
 export function ZonesPanel({
@@ -52,8 +65,7 @@ export function ZonesPanel({
 }) {
   const [paceDraft, setPaceDraft] = useState<string | null>(null);
   const hr = settings.hr;
-  const goal = plan.summary.goalSeconds;
-  const estimate = estimateThresholdPace(goal, plan.summary.totalKm);
+  const estimate = estimateThresholdPace(plan.summary.goalSeconds, plan.summary.totalKm);
   const paceText = paceDraft ?? (settings.thresholdPace === null ? "" : formatPace(settings.thresholdPace));
   const paceError = paceDraft && paceDraft.trim() && parsePace(paceDraft) === null ? "Enter a pace as m:ss per km, between 2:30 and 10:00." : undefined;
 
@@ -75,18 +87,33 @@ export function ZonesPanel({
     else if (!text.trim()) onSettingsChange({ ...settings, thresholdPace: null });
   }
 
-  const pct = (seconds: number) => (seconds / goal) * 100;
+  const hrRows: ZoneRow[] = zones.hrZones.map((z, i) => ({
+    zone: z.zone,
+    name: z.name,
+    range: `${z.min} to ${z.max} bpm`,
+    seconds: zones.hrSeconds[i],
+  }));
+  const paceRows: ZoneRow[] = zones.paceZones.map((z, i) => ({
+    zone: z.zone,
+    name: z.name,
+    range:
+      z.slowest === Infinity
+        ? `slower than ${formatPace(z.fastest)}/km`
+        : z.fastest === 0
+          ? `faster than ${formatPace(z.slowest)}/km`
+          : `${formatPace(z.slowest)} to ${formatPace(z.fastest)}/km`,
+    seconds: zones.paceSeconds[i],
+  }));
 
   return (
     <div className={styles.panel}>
-      <p className={styles.muted}>
-        Set your own zones to see which parts of the race fall in which heart rate and pace zone. They are saved in this browser.
-        On uphills the pace zone drops while heart rate rises: hold the effort, not the pace.
-      </p>
-
       <div className={styles.zonesGrid}>
-        <section className={styles.zoneForm} aria-labelledby="hr-zones-heading">
-          <h3 id="hr-zones-heading" className={styles.h3}>Heart rate zones</h3>
+        <ZoneSection
+          id="hr-zones"
+          title="Heart rate zones"
+          rows={hrRows}
+          settingsLabel={`Max ${hr.maxHr} bpm, resting ${hr.restingHr} bpm, ${METHOD_NAME[hr.method]}`}
+        >
           <div className={styles.fieldRow}>
             <NumberField
               label="Max heart rate"
@@ -128,22 +155,14 @@ export function ZonesPanel({
               ))}
             </div>
           ) : null}
+        </ZoneSection>
 
-          <ZoneTable
-            caption="Heart rate zones and estimated race time in each"
-            rangeLabel="Heart rate"
-            rows={zones.hrZones.map((z, i) => ({
-              zone: z.zone,
-              name: z.name,
-              range: `${z.min} to ${z.max} bpm`,
-              seconds: zones.hrSeconds[i],
-              pct: pct(zones.hrSeconds[i]),
-            }))}
-          />
-        </section>
-
-        <section className={styles.zoneForm} aria-labelledby="pace-zones-heading">
-          <h3 id="pace-zones-heading" className={styles.h3}>Pace zones</h3>
+        <ZoneSection
+          id="pace-zones"
+          title="Pace zones"
+          rows={paceRows}
+          settingsLabel={`Threshold ${formatPace(zones.thresholdPace)}/km${zones.thresholdEstimated ? ", estimated from your goal" : ""}`}
+        >
           <Input
             label="Threshold pace per km"
             value={paceText}
@@ -153,7 +172,7 @@ export function ZonesPanel({
             error={paceError}
             inputMode="numeric"
             autoComplete="off"
-            description={`The pace you could race for about an hour. Leave it empty to use ${formatPace(estimate)}/km, estimated from your goal.`}
+            description={`The pace you could race for about an hour. Leave it empty to use ${formatPace(estimate)}/km, estimated from your goal. Zones follow Joe Friel's run pace zones.`}
           />
           {settings.thresholdPace !== null ? (
             <div>
@@ -169,74 +188,84 @@ export function ZonesPanel({
               </Button>
             </div>
           ) : null}
-          <p className={styles.muted}>Zones follow Joe Friel&apos;s run pace zones, as a share of threshold pace.</p>
-
-          <ZoneTable
-            caption="Pace zones and race time in each"
-            rangeLabel="Pace"
-            rows={zones.paceZones.map((z, i) => ({
-              zone: z.zone,
-              name: z.name,
-              range:
-                z.slowest === Infinity
-                  ? `Slower than ${formatPace(z.fastest)}`
-                  : z.fastest === 0
-                    ? `Faster than ${formatPace(z.slowest)}`
-                    : `${formatPace(z.slowest)} to ${formatPace(z.fastest)}`,
-              seconds: zones.paceSeconds[i],
-              pct: pct(zones.paceSeconds[i]),
-            }))}
-          />
-        </section>
+        </ZoneSection>
       </div>
 
       <p className={styles.hint}>
-        Race heart rates are estimates from typical effort for your goal time, with drift over the race and changes on hills.
-        Your real numbers depend on heat, fitness and the day.
+        Your settings are saved in this browser. On uphills the pace zone drops while heart rate rises: hold the effort, not the
+        pace. Race heart rates are estimates from typical effort for your goal time; heat, fitness and the day change them.
       </p>
     </div>
   );
 }
 
-function ZoneTable({
-  caption,
-  rangeLabel,
+/** One zone system: where most of the race sits, the whole race as one bar, each zone, then its settings. */
+function ZoneSection({
+  id,
+  title,
   rows,
+  settingsLabel,
+  children,
 }: {
-  caption: string;
-  rangeLabel: string;
-  rows: { zone: number; name: string; range: string; seconds: number; pct: number }[];
+  id: string;
+  title: string;
+  rows: ZoneRow[];
+  settingsLabel: string;
+  children: ReactNode;
 }) {
+  const total = rows.reduce((s, r) => s + r.seconds, 0) || 1;
+  const top = rows.reduce((a, b) => (b.seconds > a.seconds ? b : a));
+  const pct = (s: number) => Math.round((s / total) * 100);
   return (
-    <div className={styles.tableScroll}>
-      <table className={styles.simpleTable}>
-        <caption className={styles.srOnly}>{caption}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Zone</th>
-            <th scope="col">{rangeLabel}</th>
-            <th scope="col">In this race</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.zone}>
-              <td>
-                <span className={styles.zoneTableHead}>
-                  Z{r.zone} {r.name.toLowerCase()}
-                </span>
-              </td>
-              <td className={styles.num}>{r.range}</td>
-              <td className={styles.num}>
-                {r.seconds > 0 ? `${formatClock(r.seconds)}, ${Math.round(r.pct)}%` : "None"}
-                {r.seconds > 0 ? (
-                  <span className={`${styles.zoneBar} ${styles[`zone${r.zone}`]}`} style={{ width: `${Math.max(2, r.pct)}%` }} aria-hidden="true" />
-                ) : null}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className={styles.zoneSection} aria-labelledby={`${id}-heading`}>
+      <div className={styles.zoneSectionHead}>
+        <h3 id={`${id}-heading`} className={styles.h3}>
+          {title}
+        </h3>
+        <p className={styles.muted}>
+          Most of your race is in <span className={styles.num}>Z{top.zone}</span> {top.name.toLowerCase()}, {top.range} (
+          <span className={styles.num}>{pct(top.seconds)}%</span>).
+        </p>
+      </div>
+
+      <div className={styles.zoneStack} role="img" aria-label={rows.map((r) => `Zone ${r.zone} ${pct(r.seconds)}%`).join(", ")}>
+        {rows.map((r) =>
+          r.seconds > 0 ? (
+            <span key={r.zone} className={styles[`zone${r.zone}`]} style={{ flexGrow: r.seconds }}>
+              {pct(r.seconds) >= 12 ? `Z${r.zone}` : ""}
+            </span>
+          ) : null,
+        )}
+      </div>
+
+      <ul className={styles.zoneList}>
+        {rows.map((r) => (
+          <li key={r.zone} className={`${styles.zoneItem} ${styles[`zone${r.zone}`]}`} data-empty={r.seconds === 0 || undefined}>
+            <span className={styles.zoneChip} aria-hidden="true">
+              Z{r.zone}
+            </span>
+            <span className={styles.zoneText}>
+              <span className={styles.zoneName}>{r.name}</span>
+              <span className={styles.zoneRange}>{r.range}</span>
+            </span>
+            <span className={styles.zoneTime}>
+              <span className={styles.num}>{r.seconds > 0 ? formatClock(r.seconds) : "None"}</span>
+              {r.seconds > 0 ? <span className={styles.zonePct}>{pct(r.seconds)}%</span> : null}
+            </span>
+            <span className={styles.zoneTrack} aria-hidden="true">
+              <span style={{ width: `${(r.seconds / total) * 100}%` }} />
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <details className={styles.zoneSettings}>
+        <summary>
+          <span>{settingsLabel}</span>
+          <span className={styles.zoneSettingsAction}>Change</span>
+        </summary>
+        <div className={styles.zoneForm}>{children}</div>
+      </details>
+    </section>
   );
 }
