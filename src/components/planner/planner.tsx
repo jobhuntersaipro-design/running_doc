@@ -119,16 +119,25 @@ export function Planner({
     }
   }
 
+  const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
   // Shown in the Goal section and again in Watch setup, so the goal can change right before the download.
   const goalFields = (
-    <div className={styles.goalTime} role="group" aria-label="Goal finish time">
-      <NumberField label="Hours" size="sm" value={goalH} min={0} max={9} suffix=" h" onValueChange={(v) => changeGoal(v * 3600 + goalM * 60 + goalS)} />
-      <NumberField label="Minutes" size="sm" value={goalM} min={-1} max={60} suffix=" min" onValueChange={(v) => changeGoal(goalH * 3600 + v * 60 + goalS)} />
-      <NumberField label="Seconds" size="sm" value={goalS} min={-5} max={60} step={5} suffix=" s" onValueChange={(v) => changeGoal(goalH * 3600 + goalM * 60 + v)} />
-    </div>
+    <>
+      <div className={styles.goalTime} role="group" aria-label="Goal finish time">
+        <NumberField label="Hours" size="sm" value={goalH} min={0} max={9} suffix=" h" onValueChange={(v) => changeGoal(v * 3600 + goalM * 60 + goalS)} />
+        <NumberField label="Minutes" size="sm" value={goalM} min={-1} max={60} suffix=" min" onValueChange={(v) => changeGoal(goalH * 3600 + v * 60 + goalS)} />
+        <NumberField label="Seconds" size="sm" value={goalS} min={-5} max={60} step={5} suffix=" s" onValueChange={(v) => changeGoal(goalH * 3600 + goalM * 60 + v)} />
+      </div>
+      <ChipGroup
+        label="Common goals"
+        multiple={false}
+        options={presets}
+        value={presets.some((p) => p.value === formatClock(draft)) ? [formatClock(draft)] : []}
+        onValueChange={(v) => v[0] && changeGoal(parseDuration(v[0]))}
+      />
+    </>
   );
 
-  const presets = presetsFor(km).map((p) => ({ value: p, label: p.replace(/^0:/, "").replace(/:00$/, "") }));
   const summary = plan?.summary;
   const cutoff = course?.cutoff;
   const cutoffArrival = plan && cutoff ? clockAt(startTime, timeAt(plan.timeline, cutoff.km)) : null;
@@ -170,13 +179,6 @@ export function Planner({
           <section className={styles.section} aria-labelledby="goal-heading">
             <h2 id="goal-heading" className={styles.h2}>Goal</h2>
             {goalFields}
-            <ChipGroup
-              label="Common goals"
-              multiple={false}
-              options={presets}
-              value={presets.some((p) => p.value === formatClock(draft)) ? [formatClock(draft)] : []}
-              onValueChange={(v) => v[0] && changeGoal(parseDuration(v[0]))}
-            />
             <div className={styles.goalGrid}>
               <Input
                 label="Or aim for a pace"
