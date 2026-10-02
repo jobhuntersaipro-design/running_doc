@@ -2011,3 +2011,24 @@
   white-space: nowrap;
   transform: translateX(-50%);
 }
+
+/* Map and route map previews shimmer while they load, after the same 250 ms wait as page loads. */
+.mapPlaceholder,
+.resourceMedia[data-state="loading"] {
+  background-image: linear-gradient(100deg, transparent 30%, color-mix(in oklab, var(--surface) 70%, transparent) 50%, transparent 70%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.3s ease-in-out 250ms infinite both;
+}
+
+@keyframes shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapPlaceholder,
+  .resourceMedia[data-state="loading"] {
+    animation: none;
+  }
+}
