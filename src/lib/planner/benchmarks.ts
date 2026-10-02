@@ -138,3 +138,9 @@ export function shareSlowerThan(seconds: number, mean: number): number {
   const { mu, sigma } = logNormal(mean);
   return 0.5 * (1 - erf((Math.log(seconds) - mu) / (sigma * Math.SQRT2)));
 }
+
+/** The most common finish time in a group averaging `mean` (the peak of its curve). */
+export function finishMode(mean: number): number {
+  const { mu, sigma } = logNormal(mean);
+  return Math.exp(mu - sigma ** 2);
+}

@@ -1959,7 +1959,6 @@
 .distPlot svg {
   display: block;
   width: 100%;
-  height: 170px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1987,7 +1986,6 @@
 .distGoal {
   position: absolute;
   top: 0;
-  height: 170px;
   width: 2px;
   margin-left: -1px;
   background: var(--accent);
@@ -1995,7 +1993,56 @@
 
 .distAxis {
   position: absolute;
-  inset: 170px 0 0;
+  inset: auto 0 0;
+}
+
+/* "You" tag at the top of the goal line, on whichever side has room. */
+.distGoalLabel {
+  position: absolute;
+  top: 0;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-foreground, var(--background));
+  font-size: var(--text-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  z-index: 2;
+  transform: translateX(4px);
+}
+
+.distGoalLabel[data-side="left"] {
+  transform: translateX(calc(-100% - 4px));
+}
+
+/* Each curve named at its peak, in ink with a coloured key, so identity is never colour alone. */
+.distPeakLabel {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  z-index: 1;
+  transform: translateX(-50%);
+}
+
+.distPeakLabel::before {
+  content: "";
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--men);
+}
+
+.distPeakLabel[data-kind="women"]::before {
+  background: var(--women);
 }
 
 .distResult {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
-import { FINISH_SPREAD, benchmarkFor, finishDensity, formatClock, shareSlowerThan, type FinishBenchmark } from "@/lib/planner";
+import { FINISH_SPREAD, benchmarkFor, finishDensity, finishMode, formatClock, shareSlowerThan, type FinishBenchmark } from "@/lib/planner";
 import styles from "./planner.module.css";
 
 function gap(goal: number, other: number): string {
@@ -63,7 +63,7 @@ export function FinishBenchmarks({ km, goalSeconds }: { km: number; goalSeconds:
 
 /** Round-minute ticks across the time range, three to five of them. */
 function ticks(lo: number, hi: number): number[] {
-  const step = [60, 120, 300, 600, 900, 1800, 3600].find((s) => (hi - lo) / s <= 4) ?? 3600;
+  const step = [60, 120, 300, 600, 900, 1800, 3600].find((s) => (hi - lo) / s <= 6) ?? 3600;
   const out: number[] = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(v);
   return out;
@@ -71,14 +71,18 @@ function ticks(lo: number, hi: number): number[] {
 
 const minutes = (s: number) => (s >= 3600 ? formatClock(s).replace(/:\d\d$/, "") : `${Math.round(s / 60)} min`);
 
+/** Plot height in px; the curves use the lower CURVE_H, leaving room above for labels. */
+const PLOT_H = 210;
+const CURVE_H = 150;
+
 /** An SVG path tracing the density curve from x0 to x1, closed to the baseline when `area` is set. */
 function curve(mean: number, x0: number, x1: number, peak: number, area: boolean): string {
   const pts: string[] = [];
   for (let i = 0; i <= 120; i++) {
     const t = x0 + ((x1 - x0) * i) / 120;
-    pts.push(`${((i / 120) * 1000).toFixed(1)},${(170 - (finishDensity(t, mean) / peak) * 160).toFixed(1)}`);
+    pts.push(`${((i / 120) * 1000).toFixed(1)},${(PLOT_H - (finishDensity(t, mean) / peak) * CURVE_H).toFixed(1)}`);
   }
-  return `M${pts.join("L")}${area ? "L1000,170L0,170Z" : ""}`;
+  return `M${pts.join("L")}${area ? `L1000,${PLOT_H}L0,${PLOT_H}Z` : ""}`;
 }
 
 /**
@@ -126,14 +130,33 @@ function Distribution({ b, goalSeconds }: { b: FinishBenchmark; goalSeconds: num
       </ul>
 
       <div className={styles.distPlot} aria-hidden="true">
-        <svg viewBox="0 0 1000 170" preserveAspectRatio="none">
+        <svg viewBox={`0 0 1000 ${PLOT_H}`} preserveAspectRatio="none" style={{ height: PLOT_H }}>
           <path d={curve(women, x0, x1, peak, true)} className={styles.distArea} data-kind="women" />
           <path d={curve(men, x0, x1, peak, true)} className={styles.distArea} data-kind="men" />
           <path d={curve(women, x0, x1, peak, false)} className={styles.distLine} data-kind="women" />
           <path d={curve(men, x0, x1, peak, false)} className={styles.distLine} data-kind="men" />
         </svg>
-        <span className={styles.distGoal} style={{ left: pos(goalSeconds) }} />
-        <div className={styles.distAxis}>
+        <span className={styles.distGoal} style={{ left: pos(goalSeconds), height: PLOT_H }} />
+        <span className={styles.distGoalLabel} style={{ left: pos(goalSeconds) }} data-side={goalSeconds > (x0 + x1) / 2 ? "left" : "right"}>
+          You, {formatClock(goalSeconds)}
+        </span>
+        {(
+          [
+            ["men", "Men", men, 24],
+            ["women", "Women", women, 46],
+          ] as const
+        ).map(([kind, name, mean, top]) => (
+          // Each label gets its own row above the curves, centred on its peak but kept inside the chart.
+          <span
+            key={kind}
+            className={styles.distPeakLabel}
+            data-kind={kind}
+            style={{ left: `${Math.min(88, Math.max(12, ((finishMode(mean) - x0) / (x1 - x0)) * 100))}%`, top }}
+          >
+            {name}, avg {formatClock(mean)}
+          </span>
+        ))}
+        <div className={styles.distAxis} style={{ top: PLOT_H }}>
           {ticks(x0, x1).map((v) => (
             <span key={v} className={styles.ageTick} style={{ left: pos(v) }}>
               {minutes(v)}
