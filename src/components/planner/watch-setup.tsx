@@ -42,6 +42,7 @@ export function WatchSetup({ plan }: { plan: Plan }) {
 
       {brand === "garmin" ? (
         <div className={styles.watchBody}>
+          <h3 className={styles.h3}>From a computer (exact plan)</h3>
           <p>
             The workout file has one step per kilometre with a pace range of plus or minus {TOLERANCE} seconds, so the watch
             buzzes when you drift out of it.
@@ -61,33 +62,66 @@ export function WatchSetup({ plan }: { plan: Plan }) {
             <li>Unplug the watch. It imports the file into your saved workouts.</li>
             <li>On race morning, open Run, then Training, then Workouts, and pick the plan before you start.</li>
           </ol>
+          <h3 className={styles.h3}>From your phone (no cable)</h3>
+          <p>
+            Garmin Connect only imports finished activities, not workout files, so rebuild the plan from the blocks below. Menu
+            names can differ between app versions.
+          </p>
+          <ol className={styles.steps}>
+            <li>In the Garmin Connect app, open More, then Training &amp; Planning, then Workouts, and create a running workout.</li>
+            <li>Add one step per block. Set the duration to distance and the intensity target to a custom pace range.</li>
+            <li>Save, tap Send to Device and pick your watch. It syncs over Bluetooth.</li>
+          </ol>
+          <p className={styles.muted}>
+            Prefer Garmin to work out the splits? PacePro, under Training &amp; Planning, builds its own plan from the course or
+            distance and a goal time of {formatClock(plan.summary.goalSeconds)}, and sends the same way. Its splits will not match
+            this plan exactly.
+          </p>
+          <BlocksTable plan={plan} />
         </div>
       ) : null}
 
       {brand === "coros" ? (
         <div className={styles.watchBody}>
-          <p>Build the plan in the Coros app as a structured run, one step per block below. Menu names can differ between app versions.</p>
+          <p>
+            Build the plan in the Coros app as a structured run, one step per block below, then send it to the watch over
+            Bluetooth. Menu names can differ between app versions.
+          </p>
           <ol className={styles.steps}>
-            <li>In the Coros app, open Workouts and create a new run workout.</li>
-            <li>Add one training step per block, set it to distance, and enter the block length.</li>
-            <li>Set each step&apos;s target to pace and use the range shown below.</li>
-            <li>Save and sync. On the watch, start Run and choose the workout from the training menu.</li>
+            <li>In the Coros app, open Profile, then Workout Library, and tap Create.</li>
+            <li>Tap Add Exercise for each block, set the duration to distance and enter the block length.</li>
+            <li>Set each step&apos;s intensity to pace and use the range shown below. Save.</li>
+            <li>In Workout Library, open My Workouts, pick the plan and tap Send to device.</li>
+            <li>On race morning, open Workouts from the watch&apos;s activity menu and start the plan.</li>
           </ol>
+          <p className={styles.muted}>
+            Newer watches (Pace 3 and 4, Pace Pro, Apex 2 and 4, Vertix 2, Nomad) also have Pace Strategy under Profile: pick the
+            race distance and a goal time of {formatClock(plan.summary.goalSeconds)}, and the watch shows how far ahead or behind
+            you are. Its splits will not match this plan exactly.
+          </p>
           <BlocksTable plan={plan} />
         </div>
       ) : null}
 
       {brand === "apple" ? (
         <div className={styles.watchBody}>
-          <p>Apple Watch cannot import workout files, so set it up by hand. You need watchOS 9 or later.</p>
+          <p>
+            Apple Watch cannot import workout files, so build the plan in the Fitness app on your iPhone and it syncs to the
+            watch. You need iOS 26 and watchOS 26.
+          </p>
           <ol className={styles.steps}>
-            <li>Open the Workout app, tap the more button on Outdoor Run, then Create Workout, then Custom.</li>
+            <li>On your iPhone, open Fitness, tap the Workout tab, then the timer icon on Outdoor Run, then Create Workout, then Custom.</li>
             <li>Add a work step per block below. Set the goal to distance and the alert to a pace range.</li>
+            <li>Name it and save. If asked, send it to your Apple Watch. It appears under Outdoor Run in the Workout app.</li>
             <li>
               For a simpler setup, use a single pace alert around {goalPace}/km and rely on the pace band for the hills.
             </li>
             <li>Start the custom workout at the start line.</li>
           </ol>
+          <p className={styles.muted}>
+            On watchOS 9 to 11, build it on the watch instead: open the Workout app, tap the more button on Outdoor Run, then
+            Create Workout, then Custom.
+          </p>
           <BlocksTable plan={plan} />
         </div>
       ) : null}
