@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
@@ -23,12 +23,19 @@ function download(plan: Plan) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function WatchSetup({ plan }: { plan: Plan }) {
+export function WatchSetup({ plan, goal }: { plan: Plan; goal: ReactNode }) {
   const [brand, setBrand] = useState<Brand>("garmin");
   const goalPace = formatPace(plan.summary.goalPaceSecPerKm);
 
   return (
     <div className={styles.panel}>
+      <div className={styles.watchBody}>
+        {goal}
+        <p className={styles.muted}>
+          Every step below is for a <span className={styles.num}>{formatClock(plan.summary.goalSeconds)}</span> finish, averaging{" "}
+          <span className={styles.num}>{goalPace}/km</span>. Change the time and the workout file and blocks update with it.
+        </p>
+      </div>
       <SegmentedControl
         label="Watch brand"
         value={brand}
