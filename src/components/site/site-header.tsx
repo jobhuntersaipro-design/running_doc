@@ -20,6 +20,8 @@ export function SiteHeader() {
   return (
     <header className={styles.header}>
       <Link href="/" className={styles.brand}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- the tiny app icon needs no optimizing */}
+        <img src="/icon.svg" alt="" width={28} height={28} className={styles.brandIcon} />
         Running Doc
       </Link>
       <div className={styles.actions}>
