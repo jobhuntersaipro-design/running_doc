@@ -32,7 +32,6 @@
 .navLink {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
   min-height: var(--control-height-sm);
   padding-inline: var(--space-3);
   border-radius: var(--radius-pill);
@@ -48,18 +47,21 @@
   background: var(--surface-muted);
 }
 
-/* Phones keep the header on one line: the suggest button drops to its icon. */
+/* Phones keep the header on one line; the narrowest show the app icon without the name. */
 @media (max-width: 30rem) {
   .navLink {
     padding-inline: var(--space-2);
   }
+}
 
-  .suggestLabel {
+@media (max-width: 26rem) {
+  .brandName {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 

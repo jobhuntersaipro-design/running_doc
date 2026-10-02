@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
 import { setTheme, useTheme } from "./theme";
@@ -23,12 +22,11 @@ export function SiteHeader() {
       <Link href="/" className={styles.brand}>
         {/* eslint-disable-next-line @next/next/no-img-element -- the tiny app icon needs no optimizing */}
         <img src="/icon.svg" alt="" width={28} height={28} className={styles.brandIcon} />
-        Running Doc
+        <span className={styles.brandName}>Running Doc</span>
       </Link>
       <div className={styles.actions}>
         <Link href="/suggestion" className={styles.navLink}>
-          <Lightbulb size={16} strokeWidth={1.8} aria-hidden="true" />
-          <span className={styles.suggestLabel}>Suggest</span>
+          Feedback
         </Link>
         {me === undefined ? null : (
           <Link href={me ? (me.admin ? "/admin" : "/my") : "/signin"} className={styles.navLink}>
