@@ -21,12 +21,15 @@ export function Overview({
   events,
   likes,
   viewerEmail,
+  isAdmin = false,
 }: {
   events: RaceEvent[];
   /** By event key. */
   likes: Record<string, Likes>;
   /** The signed-in runner, if any. */
   viewerEmail?: string;
+  /** The admin sees a visibility badge on every card, not only on private and published ones. */
+  isAdmin?: boolean;
 }) {
   const signedIn = Boolean(viewerEmail);
   return (
@@ -65,9 +68,9 @@ export function Overview({
                   </div>
                 )}
                 <div className={styles.cardBody}>
-                  {e.private || e.publishedBy ? (
+                  {e.private || e.publishedBy || isAdmin ? (
                     <p className={styles.privacy}>
-                      <VisibilityBadge visibility={e.private ? "private" : "published"} />
+                      <VisibilityBadge visibility={e.private ? "private" : e.publishedBy ? "published" : "public"} />
                       {!e.private
                         ? "Everyone can see this"
                         : r.owner?.toLowerCase() === viewerEmail?.toLowerCase()

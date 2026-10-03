@@ -146,6 +146,7 @@ export function RaceDashboard({
                             </span>
                             <span className={styles.raceMeta}>
                               {r.dateLabel}
+                              {r.builtIn ? ", built in" : ""}
                               {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
                               {r.publishedBy ? `, published by ${r.publishedBy}` : ""}
                               {r.bib && base === "/my" ? `, bib ${r.bib}` : ""}
