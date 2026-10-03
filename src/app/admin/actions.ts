@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getRace } from "@/lib/courses";
+import { findCountry } from "@/lib/countries";
 import { parseGpx, type Station } from "@/lib/planner";
+import { logEvent } from "@/lib/server/activity";
+import { announceRace } from "@/lib/server/announce";
 import { endSession, getUser, isAdmin, startSession, verifyCredentials, type SessionUser } from "@/lib/server/auth";
 import {
   cardFacts,
@@ -11,9 +16,12 @@ import {
   getCoverOverride,
   getStoredRace,
   listRaces,
+  publishedTwin,
+  RUNNING_DOC,
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
+import { forgetRace } from "@/lib/server/runners";
 import { deleteFiles, readText, saveFile, StorageError, StorageNotReadyError } from "@/lib/server/store";
 import { DISTANCES, LIMITS, STATION_KINDS, formatMb, type DistanceValue, type FormState } from "./shared";
 
@@ -38,6 +46,14 @@ const owns = (user: SessionUser, race: StoredRace) => user.admin || race.owner?.
 const homeOf = (user: SessionUser) => (user.admin ? "/admin" : "/my");
 /** ponytail: flat cap per runner, add quotas by storage size if R2 costs matter. */
 const MAX_RACES_PER_RUNNER = 20;
+
+/** Emails runners about a newly public race once the response is sent, so publishing never waits on email. */
+async function announceLater(race: Parameters<typeof announceRace>[0], user: SessionUser, alsoSkip: (string | undefined)[]) {
+  const h = await headers();
+  const site = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+  const except = [user.email, ...alsoSkip.filter((e): e is string => Boolean(e))];
+  after(() => announceRace(race, site, user.email, except).catch((e) => console.error("Announcing race failed:", e)));
+}
 
 function storageError(e: unknown): FormState {
   if (e instanceof StorageNotReadyError || e instanceof StorageError) return { error: e.message };
@@ -137,7 +153,9 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
   const event = text(fd, "event");
   const category = text(fd, "category");
   const date = text(fd, "date");
-  const location = text(fd, "location");
+  const country = findCountry(text(fd, "country"));
+  const city = text(fd, "city");
+  const bib = text(fd, "bib");
   const officialUrl = text(fd, "officialUrl");
   const startTime = text(fd, "startTime");
   const distance = text(fd, "distance") as DistanceValue;
@@ -146,7 +164,9 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
   if (event.length < 3 || event.length > 120) fieldErrors.event = "Enter the event name, 3 to 120 characters.";
   if (category.length < 2 || category.length > 80) fieldErrors.category = "Enter the race category, for example Half marathon.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) fieldErrors.date = "Choose the race date.";
-  if (location.length < 2 || location.length > 120) fieldErrors.location = "Enter where the race is, for example Kuala Lumpur, Malaysia.";
+  if (!country) fieldErrors.country = "Choose the country from the list.";
+  if (city.length < 2 || city.length > 80) fieldErrors.city = "Enter the city, for example Kuala Lumpur.";
+  if (bib && !/^[\p{L}\p{N} -]{1,12}$/u.test(bib)) fieldErrors.bib = "Use up to 12 letters and numbers.";
   try {
     const u = new URL(officialUrl);
     if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
@@ -240,7 +260,10 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       category,
       date,
       dateLabel: dateLabelOf(date),
-      location,
+      location: `${city}, ${country!.name}`,
+      country: country!.code,
+      city,
+      bib: bib || undefined,
       officialUrl,
       distance,
       officialKm,
@@ -252,9 +275,16 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       coverUrl,
       facts,
       owner: existing ? existing.owner : user.admin ? undefined : user.email,
+      ownerName: existing ? existing.ownerName : user.admin ? undefined : user.name,
+      publishedBy: existing?.publishedBy,
+      publishedAt: existing?.publishedAt,
+      announcedAt: existing ? existing.announcedAt : user.admin ? Date.now() : undefined,
       updatedAt: Date.now(),
     };
     await saveRecord(record);
+    await logEvent(user.email, existing ? "race_edited" : "race_added", id, `${event}, ${category}`);
+    // The admin's new races are public at once, so runners hear about them like a published race.
+    if (!existing && user.admin) await announceLater({ ...record, publishedBy: RUNNING_DOC }, user, []);
     await deleteFiles(replaced);
     revalidatePath("/");
     revalidatePath(`/races/${id}`);
@@ -282,6 +312,7 @@ export async function saveCover(_prev: FormState, fd: FormData): Promise<FormSta
       coverUrl = await saveFile(`races/${id}/cover.${cover.ext}`, cover.body, cover.type, { randomSuffix: true });
     }
     await saveRecord({ kind: "cover", id, coverUrl, updatedAt: Date.now() });
+    await logEvent((await getUser())?.email ?? "admin", "cover", id, coverUrl ? "set" : "removed");
     if (existing?.coverUrl) await deleteFiles([existing.coverUrl]);
     revalidatePath("/");
     revalidatePath("/admin");
@@ -291,7 +322,54 @@ export async function saveCover(_prev: FormState, fd: FormData): Promise<FormSta
   redirect("/admin?saved=1");
 }
 
-/** Deletes a race added in /admin, with its files. Built-in races live in the code and cannot be deleted here. */
+/**
+ * Makes a runner's race public, credited to them. A race that is already public
+ * (same event, day and distance) is not published twice: the runner is sent to it instead.
+ */
+export async function publishRace(id: string): Promise<FormState> {
+  const user = await requireUser();
+  let twin;
+  try {
+    const race = await getStoredRace(id);
+    if (!race || !owns(user, race)) return { error: "This race no longer exists." };
+    if (!race.owner || race.publishedAt !== undefined) return { error: "This race is already public." };
+    twin = await publishedTwin(race);
+    if (!twin) {
+      // The admin publishing a runner's race credits the runner, not "Admin".
+      const by = user.admin ? (race.ownerName ?? race.owner.split("@")[0]) : user.name;
+      const published = { ...race, publishedBy: by, publishedAt: Date.now(), announcedAt: race.announcedAt ?? Date.now(), updatedAt: Date.now() };
+      await saveRecord(published);
+      await logEvent(user.email, "race_published", id, `${race.event}, ${race.category}`);
+      if (!race.announcedAt) await announceLater({ ...published, publishedBy: by }, user, [race.owner]);
+    }
+  } catch (e) {
+    return storageError(e);
+  }
+  if (twin) redirect(`/races/${twin.id}?duplicate=1`);
+  revalidatePath("/");
+  revalidatePath(`/races/${id}`);
+  revalidatePath(homeOf(user));
+  return {};
+}
+
+/** Makes a published race private to its runner again. */
+export async function unpublishRace(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    const race = await getStoredRace(id);
+    if (!race || !owns(user, race) || race.publishedAt === undefined) return { error: "This race is not published." };
+    await saveRecord({ ...race, publishedBy: undefined, publishedAt: undefined, updatedAt: Date.now() });
+    await logEvent(user.email, "race_unpublished", id, `${race.event}, ${race.category}`);
+  } catch (e) {
+    return storageError(e);
+  }
+  revalidatePath("/");
+  revalidatePath(`/races/${id}`);
+  revalidatePath(homeOf(user));
+  return {};
+}
+
+/** Deletes a race added by a runner or the admin, with its files, comments and saved goals. Built-in races live in the code and cannot be deleted here. */
 export async function deleteRace(id: string): Promise<FormState> {
   const user = await requireUser();
   if (getRace(id)) return { error: "Built-in races are part of the code and cannot be deleted here." };
@@ -299,6 +377,8 @@ export async function deleteRace(id: string): Promise<FormState> {
     const race = await getStoredRace(id);
     if (!race || !owns(user, race)) return { error: "This race no longer exists." };
     await deleteRaceFiles(id);
+    await forgetRace(id).catch((e) => console.error("Removing a deleted race's comments and goals failed:", e));
+    await logEvent(user.email, "race_deleted", id, `${race.event}, ${race.category}${race.owner && !owns({ ...user, admin: false }, race) ? ` (added by ${race.owner})` : ""}`);
   } catch (e) {
     return storageError(e);
   }

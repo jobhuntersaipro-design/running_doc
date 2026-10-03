@@ -6,12 +6,14 @@ import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { Checkbox } from "@/components/arc/checkbox/checkbox";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
+import { Combobox } from "@/components/arc/combobox/combobox";
 import { FileDropzone } from "@/components/arc/file-dropzone/file-dropzone";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
 import { RadioGroup } from "@/components/arc/radio-group/radio-group";
 import { saveRace } from "@/app/admin/actions";
 import { DISTANCES, LIMITS, STATION_KINDS, formatMb, type DistanceValue, type FormState } from "@/app/admin/shared";
+import { COUNTRIES, findCountry, splitLocation } from "@/lib/countries";
 import { haversineM, parseGpx, type Station, type StationKind } from "@/lib/planner";
 import type { StoredRace } from "@/lib/server/races";
 import styles from "./admin.module.css";
@@ -28,6 +30,8 @@ function useObjectUrl(file: File | null) {
   return url;
 }
 
+const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name, keywords: [c.code] }));
+
 export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** Event names already in use, suggested so distances group under one event. */ events?: string[] }) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(saveRace, {});
   const [distance, setDistance] = useState<DistanceValue>(race?.distance ?? "half");
@@ -35,7 +39,9 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
   const [stations, setStations] = useState<Station[]>(race?.stations ?? []);
   const [approximate, setApproximate] = useState(race?.stationsApproximate ?? false);
   const [gpx, setGpx] = useState<File | null>(null);
-  const [gpxInfo, setGpxInfo] = useState<{ km: number } | { error: string } | null>(null);
+  const [gpxInfo, setGpxInfo] = useState<{ km: number; picked: DistanceValue } | { error: string } | null>(null);
+  const [place] = useState(() => (race ? { country: race.country ?? "", city: race.city ?? "", ...(race.country ? {} : splitLocation(race.location)) } : null));
+  const [country, setCountry] = useState(() => (place?.country ? (findCountry(place.country)?.code ?? "") : ""));
   const [pdf, setPdf] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
   const [removeCover, setRemoveCover] = useState(false);
@@ -56,12 +62,10 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
       let m = 0;
       for (let i = 1; i < points.length; i++) m += haversineM(points[i - 1], points[i]);
       const measured = m / 1000;
-      setGpxInfo({ km: measured });
-      if (!race) {
-        const d = guessDistance(measured);
-        setDistance(d);
-        if (d === "custom") setCustomKm(measured.toFixed(2));
-      }
+      const picked = guessDistance(measured);
+      setGpxInfo({ km: measured, picked });
+      setDistance(picked);
+      if (picked === "custom") setCustomKm(measured.toFixed(2));
     } catch (e) {
       setGpxInfo({ error: e instanceof Error ? e.message : "This file could not be read" });
     }
@@ -78,6 +82,7 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
     const fd = new FormData(e.currentTarget);
     if (race) fd.set("id", race.id);
     fd.set("distance", distance);
+    fd.set("country", country);
     fd.set("customKm", customKm);
     fd.set("stations", JSON.stringify(stations));
     if (approximate) fd.set("stationsApproximate", "on");
@@ -127,23 +132,38 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
         />
         <div className={styles.fieldRow}>
           <Input label="Race date" name="date" type="date" defaultValue={race?.date} error={fe.date} required />
+          <Input label="Start time" name="startTime" type="time" defaultValue={race?.startTime} description="Optional, local time." error={fe.startTime} />
           <Input
-            label="Start time"
-            name="startTime"
-            type="time"
-            defaultValue={race?.startTime}
-            description="Optional, local time."
-            error={fe.startTime}
+            label="Bib number"
+            name="bib"
+            defaultValue={race?.bib}
+            placeholder="21034"
+            description="Optional. Only you see it."
+            maxLength={12}
+            autoComplete="off"
+            error={fe.bib}
           />
         </div>
-        <Input
-          label="Location"
-          name="location"
-          defaultValue={race?.location}
-          placeholder="Kuala Lumpur, Malaysia"
-          error={fe.location}
-          required
-        />
+        <div className={styles.fieldRow}>
+          <div className={styles.fileField}>
+            <Combobox
+              label="Country"
+              options={COUNTRY_OPTIONS}
+              value={country}
+              onValueChange={setCountry}
+              placeholder="Search countries"
+              emptyMessage="No country matches"
+              aria-invalid={fe.country ? true : undefined}
+              required
+            />
+            {fe.country ? (
+              <p className={styles.fieldError} role="alert">
+                {fe.country}
+              </p>
+            ) : null}
+          </div>
+          <Input label="City" name="city" defaultValue={place?.city} placeholder="Kuala Lumpur" autoComplete="address-level2" error={fe.city} required />
+        </div>
         <Input
           label="Official website"
           name="officialUrl"
@@ -175,12 +195,6 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
               Current GPX
             </a>
           ) : null}
-          {gpxInfo && "km" in gpxInfo ? (
-            <p className={styles.muted}>
-              This GPX measures <span className={styles.num}>{gpxInfo.km.toFixed(2)} km</span>. The plan stretches it to the official
-              distance so splits match the race markers.
-            </p>
-          ) : null}
           {gpxInfo && "error" in gpxInfo ? (
             <Alert tone="danger" title="This GPX could not be used">
               {gpxInfo.error}. Export the course again as a GPX track with elevation.
@@ -196,6 +210,17 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
           onValueChange={(v) => setDistance(v as DistanceValue)}
           options={DISTANCES.map((d) => ({ value: d.value, label: d.label, description: d.km ? `${d.km} km` : "Enter the distance" }))}
         />
+        <p className={styles.muted} role="status">
+          {gpxInfo && "km" in gpxInfo ? (
+            <>
+              Your GPX measures <span className={styles.num}>{gpxInfo.km.toFixed(2)} km</span>, so we picked{" "}
+              {DISTANCES.find((d) => d.value === gpxInfo.picked)?.label}. Change it if the organiser&apos;s
+              distance is different. The plan stretches the course to the official distance, so splits match the km markers.
+            </>
+          ) : (
+            "Picked for you from the course GPX when you add it. Change it if the organiser's distance is different."
+          )}
+        </p>
         {distance === "custom" ? (
           <Input
             label="Distance in km"

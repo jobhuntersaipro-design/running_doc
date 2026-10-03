@@ -24,6 +24,13 @@
   gap: var(--space-2);
 }
 
+.titleActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .title {
   font-family: var(--font-display);
   font-size: var(--text-3xl);
@@ -2186,4 +2193,48 @@
   left: 0;
   border-radius: 0 4px 4px 0;
   background: var(--series-1);
+}
+
+/* Comments */
+
+/* Race comments are not resolved like a review thread, so the thread's Resolve button is hidden. */
+.thread [data-resolve] {
+  display: none;
+}
+
+/* Heat and humidity */
+
+.heat {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.heatFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Plan vs actual */
+
+.behind {
+  color: var(--danger);
+}
+
+.ahead {
+  color: var(--success);
 }

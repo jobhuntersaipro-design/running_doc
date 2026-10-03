@@ -13,3 +13,5 @@ export * from "./runner";
 export { addRunnerNotes, buildChapters } from "./mind";
 export * from "./benchmarks";
 export { routePreview } from "./preview";
+export { dewPointC, heatSlowdown, raceConditions, type HourlyWeather } from "./heat";
+export { parseRun, reviewRun, type RunPoint, type RunReview } from "./actual";

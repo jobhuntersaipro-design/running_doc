@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
+import { Avatar } from "@/components/arc/avatar/avatar";
 import { RoutePreview } from "@/components/site/route-preview";
+import { LikeButton } from "@/components/site/like-button";
 import { SiteHeader } from "@/components/site/site-header";
+import { VisibilityBadge } from "@/components/site/visibility-badge";
 import { shortDistance } from "@/lib/courses/distance";
-import type { RaceEvent } from "@/lib/server/races";
+import type { Likes } from "@/lib/server/likes";
+import { RUNNING_DOC, RUNNING_DOC_AVATAR, type RaceEvent } from "@/lib/server/races";
 import styles from "./overview.module.css";
 
 function startLabel(hhmm?: string) {
@@ -13,7 +17,21 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per event, with a ribbon for each distance. Opening a card shows its race plan. */
-export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: boolean }) {
+export function Overview({
+  events,
+  likes,
+  viewerEmail,
+  isAdmin = false,
+}: {
+  events: RaceEvent[];
+  /** By event key. */
+  likes: Record<string, Likes>;
+  /** The signed-in runner, if any. */
+  viewerEmail?: string;
+  /** The admin sees a visibility badge on every card, not only on private and published ones. */
+  isAdmin?: boolean;
+}) {
+  const signedIn = Boolean(viewerEmail);
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -50,15 +68,26 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                   </div>
                 )}
                 <div className={styles.cardBody}>
-                  <p className={styles.date}>
-                    {e.dateLabel}
-                    {e.private ? ", only you can see this" : ""}
-                  </p>
+                  {e.private || e.publishedBy || isAdmin ? (
+                    <p className={styles.privacy}>
+                      <VisibilityBadge visibility={e.private ? "private" : e.publishedBy ? "published" : "public"} />
+                      {!e.private
+                        ? "Everyone can see this"
+                        : r.owner?.toLowerCase() === viewerEmail?.toLowerCase()
+                          ? "Only you can see this"
+                          : `Only ${e.createdBy} and admins can see this`}
+                    </p>
+                  ) : null}
+                  <p className={styles.date}>{e.dateLabel}</p>
                   <h2 className={styles.cardTitle}>{e.event}</h2>
                   <p className={styles.meta}>
                     {single ? `${r.category}, ` : ""}
                     {e.location}
                     {single && startLabel(r.startTime) ? `, ${startLabel(r.startTime)}` : ""}
+                  </p>
+                  <p className={styles.byline}>
+                    <Avatar name={e.createdBy} src={e.createdBy === RUNNING_DOC ? RUNNING_DOC_AVATAR : undefined} size="sm" />
+                    {e.publishedBy ? "Published" : "Created"} by {e.createdBy}
                   </p>
                   <span className={styles.open}>
                     Open race plan
@@ -92,6 +121,9 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                       </li>
                     ))
                   : null}
+                <li className={styles.likeItem}>
+                  <LikeButton raceId={r.id} event={e.event} likes={likes[e.key] ?? { count: 0, mine: false }} signedIn={signedIn} />
+                </li>
               </ul>
             </li>
           );

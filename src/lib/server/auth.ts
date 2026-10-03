@@ -53,6 +53,9 @@ export interface SessionUser {
 
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Whether this is the admin's email. The admin speaks as Running Doc. */
+export const isAdminEmail = (email: string) => adminConfigured() && sameEmail(email, process.env.ADMIN_EMAIL ?? "");
+
 /** Signs the user in for SESSION_DAYS. The admin is whoever has ADMIN_EMAIL, by password or Google. */
 export async function startSession(user: { email: string; name: string }): Promise<void> {
   const payload = Buffer.from(
