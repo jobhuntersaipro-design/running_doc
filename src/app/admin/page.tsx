@@ -42,7 +42,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
     );
   }
 
-  const { saved, tab: tabParam, race: raceId, runner: runnerEmail } = await props.searchParams;
+  const { saved, tab: tabParam, race: raceId, runner: runnerEmail, published } = await props.searchParams;
   const tab = tabParam === "runners" || runnerEmail ? "runners" : "races";
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const raceSel = one(raceId);
@@ -100,6 +100,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
             saved={Boolean(saved)}
             storage={storage}
             stats={stats}
+            published={one(published)}
           />
         </>
       ) : !runners ? (

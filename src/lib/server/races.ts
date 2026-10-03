@@ -42,6 +42,8 @@ export interface StoredRace {
   facts: CardFacts;
   /** Email of the runner who added it. Their races are private to them until published; admin races have no owner and are public. */
   owner?: string;
+  /** The runner's name when they added it, shown as "created by". */
+  ownerName?: string;
   /** Set when a runner publishes their race for everyone: the name shown as "published by". */
   publishedBy?: string;
   publishedAt?: number;
@@ -76,13 +78,18 @@ export interface RaceCard extends CardFacts {
   private: boolean;
   owner?: string;
   publishedBy?: string;
+  /** Who made it: the runner who added or published it, or Running Doc for built-in and admin races. */
+  createdBy: string;
 }
 
 /** Who is looking: private races show only to their owner, or to the admin. */
 export interface Viewer {
   email: string;
   admin: boolean;
+  name?: string;
 }
+
+export const RUNNING_DOC = "Running Doc";
 
 export const canSee = (r: StoredRace, viewer: Viewer | null) =>
   !r.owner || r.publishedAt !== undefined || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
@@ -184,6 +191,7 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
         coverUrl: override?.kind === "cover" ? override.coverUrl : undefined,
         builtIn: true,
         private: false,
+        createdBy: RUNNING_DOC,
       };
     }),
   );
@@ -207,6 +215,9 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
         private: Boolean(r.owner) && r.publishedAt === undefined,
         owner: r.owner,
         publishedBy: r.publishedBy,
+        createdBy: !r.owner
+          ? RUNNING_DOC
+          : (r.publishedBy ?? (viewer?.name && viewer.email.toLowerCase() === r.owner.toLowerCase() ? viewer.name : (r.ownerName ?? r.owner.split("@")[0]))),
       }),
     );
   return [...builtIn, ...stored].sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
@@ -259,6 +270,7 @@ export interface RaceEvent {
   races: RaceCard[];
   private: boolean;
   publishedBy?: string;
+  createdBy: string;
 }
 
 /** Races with the same key are distances of one event: same name, and the same runner if private. */
@@ -291,6 +303,7 @@ export function groupByEvent(races: RaceCard[]): RaceEvent[] {
         races: sorted,
         private: main.private,
         publishedBy: main.publishedBy,
+        createdBy: main.createdBy,
       };
     })
     .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Globe } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
@@ -15,6 +15,7 @@ import styles from "./admin.module.css";
  */
 export function PublishRace({ id, published }: { id: string; published: boolean }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string>();
   const [pending, startTransition] = useTransition();
@@ -26,7 +27,8 @@ export function PublishRace({ id, published }: { id: string; published: boolean 
       if (res.error) {
         setDone(false);
         setError(res.error);
-      } else router.refresh();
+      } else if (publish) router.replace(`${pathname}?published=${encodeURIComponent(id)}`, { scroll: false });
+      else router.refresh();
     });
   }
 

@@ -7,6 +7,7 @@ import { ExpandableCard } from "@/components/arc/expandable-card/expandable-card
 import { DeleteRace } from "./delete-race";
 import { eventKey } from "@/lib/server/races";
 import { PublishRace } from "./publish-race";
+import { PublishedToast } from "./published-toast";
 import styles from "./admin.module.css";
 
 interface Row {
@@ -63,6 +64,7 @@ export function RaceDashboard({
   storage,
   empty,
   stats,
+  published,
   children,
 }: {
   title: string;
@@ -75,6 +77,8 @@ export function RaceDashboard({
   empty?: string;
   /** Admin only: engagement per race id. Adds it to each row with a link to the race's details. */
   stats?: Record<string, RaceStats>;
+  /** Id of a race that was just published, to confirm it with a toast. */
+  published?: string;
   /** Shown under the heading, above the race list. */
   children?: ReactNode;
 }) {
@@ -83,6 +87,7 @@ export function RaceDashboard({
     const key = eventKey({ ...r, private: Boolean(r.owner) && !r.publishedBy });
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
+  const justPublished = published ? races.find((r) => r.id === published) : undefined;
   const events = [...groups.values()].map((list) => list.sort((a, b) => a.km - b.km));
   return (
     <>
@@ -111,6 +116,8 @@ export function RaceDashboard({
       ) : null}
 
       {children}
+
+      {justPublished ? <PublishedToast name={`${justPublished.event}, ${justPublished.category}`} /> : null}
 
       {races.length === 0 && empty ? <p className={styles.notice}>{empty}</p> : null}
 

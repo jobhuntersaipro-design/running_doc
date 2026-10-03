@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "My races", robots: { index: false, f
 export default async function MyRacesPage(props: PageProps<"/my">) {
   const user = await getUser();
   if (!user) redirect("/signin?next=/my");
-  const { saved: raceSaved } = await props.searchParams;
+  const { saved: raceSaved, published } = await props.searchParams;
   const [all, storage, goals, cards] = await Promise.all([
     listRaces().catch(() => []),
     checkStorage(),
@@ -39,6 +39,7 @@ export default async function MyRacesPage(props: PageProps<"/my">) {
         races={races}
         saved={Boolean(raceSaved)}
         storage={storage}
+        published={typeof published === "string" ? published : undefined}
         empty="No races added yet. Add your race with its course GPX, route map and documents to get a full plan."
       >
         <SavedGoals goals={saved} />

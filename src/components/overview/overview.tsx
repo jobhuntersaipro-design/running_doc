@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
+import { ArrowRight, ExternalLink, FileDown, Lock, Plus } from "lucide-react";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
 import { RoutePreview } from "@/components/site/route-preview";
 import { SiteHeader } from "@/components/site/site-header";
 import { shortDistance } from "@/lib/courses/distance";
-import type { RaceEvent } from "@/lib/server/races";
+import { RUNNING_DOC, type RaceEvent } from "@/lib/server/races";
 import styles from "./overview.module.css";
 
 function startLabel(hhmm?: string) {
@@ -50,15 +52,24 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                   </div>
                 )}
                 <div className={styles.cardBody}>
-                  <p className={styles.date}>
-                    {e.dateLabel}
-                    {e.private ? ", only you can see this" : e.publishedBy ? `, published by ${e.publishedBy}` : ""}
-                  </p>
+                  {e.private ? (
+                    <p className={styles.privacy}>
+                      <Badge tone="neutral" size="sm" icon={<Lock size={12} strokeWidth={1.75} />}>
+                        Private
+                      </Badge>
+                      Only you can see this
+                    </p>
+                  ) : null}
+                  <p className={styles.date}>{e.dateLabel}</p>
                   <h2 className={styles.cardTitle}>{e.event}</h2>
                   <p className={styles.meta}>
                     {single ? `${r.category}, ` : ""}
                     {e.location}
                     {single && startLabel(r.startTime) ? `, ${startLabel(r.startTime)}` : ""}
+                  </p>
+                  <p className={styles.byline}>
+                    <Avatar name={e.createdBy} src={e.createdBy === RUNNING_DOC ? "/apple-icon.png" : undefined} size="sm" />
+                    {e.publishedBy ? "Published" : "Created"} by {e.createdBy}
                   </p>
                   <span className={styles.open}>
                     Open race plan

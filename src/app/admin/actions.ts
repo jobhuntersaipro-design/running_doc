@@ -262,6 +262,7 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       coverUrl,
       facts,
       owner: existing ? existing.owner : user.admin ? undefined : user.email,
+      ownerName: existing ? existing.ownerName : user.admin ? undefined : user.name,
       publishedBy: existing?.publishedBy,
       publishedAt: existing?.publishedAt,
       updatedAt: Date.now(),
@@ -318,7 +319,9 @@ export async function publishRace(id: string): Promise<FormState> {
     if (!race.owner || race.publishedAt !== undefined) return { error: "This race is already public." };
     twin = await publishedTwin(race);
     if (!twin) {
-      await saveRecord({ ...race, publishedBy: user.name, publishedAt: Date.now(), updatedAt: Date.now() });
+      // The admin publishing a runner's race credits the runner, not "Admin".
+      const by = user.admin ? (race.ownerName ?? race.owner.split("@")[0]) : user.name;
+      await saveRecord({ ...race, publishedBy: by, publishedAt: Date.now(), updatedAt: Date.now() });
       await logEvent(user.email, "race_published", id, `${race.event}, ${race.category}`);
     }
   } catch (e) {
