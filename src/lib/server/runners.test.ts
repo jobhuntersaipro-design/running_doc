@@ -9,7 +9,7 @@ vi.mock("@neondatabase/serverless", () => ({
     db.queries.push({ text, values });
     if (text.startsWith("select profile")) return [{ profile: db.profile }];
     if (text.startsWith("select goals")) return [{ goals: db.goals }];
-    return text.startsWith("select") ? [{ email: "alex@gmail.com", name: "Alex Tan", signed_up_at: new Date("2026-10-02T08:05:00Z") }] : [];
+    return text.startsWith("select") ? [{ email: "alex@gmail.com", name: "Alex Tan", signed_up_at: new Date("2026-10-02T08:05:00Z"), last_sign_in_at: new Date("2026-10-03T07:00:00Z") }] : [];
   },
 }));
 
@@ -40,7 +40,9 @@ describe("runners", () => {
     const { recordSignIn, listRunners } = await load("postgres://neon");
     await recordSignIn(" Alex@Gmail.com ", "Alex Tan");
     await recordSignIn("alex@gmail.com", "Alex Tan");
-    expect(await listRunners()).toEqual([{ email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z" }]);
+    expect(await listRunners()).toEqual([
+      { email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z", lastSignInAt: "2026-10-03T07:00:00.000Z", profile: null, goals: {} },
+    ]);
     expect(db.queries.at(-1)?.text).toContain("order by signed_up_at desc");
     expect(db.queries.filter((q) => q.text.startsWith("create table if not exists runners")).length).toBe(1);
     const insert = db.queries.find((q) => q.text.startsWith("insert"));
