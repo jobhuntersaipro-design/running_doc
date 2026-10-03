@@ -251,6 +251,8 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     files: filesOf(r),
     publishedBy: r.publishedBy,
     bib: mine ? r.bib : undefined,
+    /** Its runner and the admin can delete it. */
+    deletable: viewer !== null && (viewer.admin || r.owner?.toLowerCase() === viewer.email.toLowerCase()),
   };
 }
 

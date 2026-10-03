@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Alert } from "@/components/arc/alert/alert";
 import { Planner } from "@/components/planner/planner";
 import { RaceComments } from "@/components/planner/race-comments";
+import { DeleteRace } from "@/components/admin/delete-race";
 import { LikeButton } from "@/components/site/like-button";
 import { getRace } from "@/lib/courses";
 import { getUser } from "@/lib/server/auth";
@@ -86,13 +87,17 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
     savedGoalFor(id, user?.email),
     commentsFor(id),
   ]);
-  // The like button carries a key: without one, React warns about an element passed from this page into the client Planner.
+  // The buttons carry keys: without them, React warns about elements passed from this page into the client Planner.
+  const actions = [
+    event.name ? <LikeButton key="like" raceId={id} event={event.name} likes={event.likes} signedIn={!!user} /> : null,
+    stored?.deletable ? <DeleteRace key="delete" id={id} name={stored.name} then={user?.admin ? "/admin" : "/my"} /> : null,
+  ];
   return (
     <Planner
       race={race}
       officialPreview={officialPreview}
       distances={event.distances}
-      like={event.name ? <LikeButton key="like" raceId={id} event={event.name} likes={event.likes} signedIn={!!user} /> : null}
+      actions={actions}
       signedIn={!!user}
       savedGoal={savedGoal}
       notice={noticeFor(await props.searchParams)}

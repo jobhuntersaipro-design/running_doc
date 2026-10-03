@@ -64,7 +64,7 @@ export function Planner({
   signedIn = false,
   savedGoal = null,
   notice,
-  like,
+  actions,
   children,
 }: {
   race: PlannerRace | null;
@@ -76,8 +76,8 @@ export function Planner({
   savedGoal?: SavedGoal | null;
   /** Shown above the title, such as why the runner landed here. */
   notice?: ReactNode;
-  /** The like button, under the title. */
-  like?: ReactNode;
+  /** Buttons under the title: the like, and delete for the race's runner or the admin. */
+  actions?: ReactNode;
   /** Shown after the plan, such as the comments. */
   children?: ReactNode;
 }) {
@@ -189,7 +189,7 @@ export function Planner({
               ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.${race.publishedBy ? ` Published by ${race.publishedBy}.` : ""}${race.bib ? ` Your bib: ${race.bib}.` : ""}`
               : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
-          {like}
+          {actions ? <div className={styles.titleActions}>{actions}</div> : null}
         </div>
         {distances.length > 1 ? (
           <nav className={styles.distanceTabs} aria-label="Race distance">

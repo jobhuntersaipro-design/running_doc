@@ -150,3 +150,11 @@ export async function setRaceEmails(email: string, on: boolean): Promise<boolean
   const rows = await q`update runners set race_emails = ${on} where email = ${key(email)} returning email`;
   return rows.length > 0;
 }
+
+/** Removes what runners left on a deleted race: its comments (their reactions go with them) and goals saved for it. */
+export async function forgetRace(raceId: string): Promise<void> {
+  const q = await db();
+  if (!q) return;
+  await q`delete from comments where race_id = ${raceId}`;
+  await q`update runners set goals = goals - ${raceId}::text where goals ? ${raceId}::text`;
+}

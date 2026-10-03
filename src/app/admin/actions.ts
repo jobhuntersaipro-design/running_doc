@@ -21,6 +21,7 @@ import {
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
+import { forgetRace } from "@/lib/server/runners";
 import { deleteFiles, readText, saveFile, StorageError, StorageNotReadyError } from "@/lib/server/store";
 import { DISTANCES, LIMITS, STATION_KINDS, formatMb, type DistanceValue, type FormState } from "./shared";
 
@@ -368,7 +369,7 @@ export async function unpublishRace(id: string): Promise<FormState> {
   return {};
 }
 
-/** Deletes a race added in /admin, with its files. Built-in races live in the code and cannot be deleted here. */
+/** Deletes a race added by a runner or the admin, with its files, comments and saved goals. Built-in races live in the code and cannot be deleted here. */
 export async function deleteRace(id: string): Promise<FormState> {
   const user = await requireUser();
   if (getRace(id)) return { error: "Built-in races are part of the code and cannot be deleted here." };
@@ -376,6 +377,7 @@ export async function deleteRace(id: string): Promise<FormState> {
     const race = await getStoredRace(id);
     if (!race || !owns(user, race)) return { error: "This race no longer exists." };
     await deleteRaceFiles(id);
+    await forgetRace(id).catch((e) => console.error("Removing a deleted race's comments and goals failed:", e));
     await logEvent(user.email, "race_deleted", id, `${race.event}, ${race.category}${race.owner && !owns({ ...user, admin: false }, race) ? ` (added by ${race.owner})` : ""}`);
   } catch (e) {
     return storageError(e);
