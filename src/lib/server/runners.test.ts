@@ -55,7 +55,7 @@ describe("runners", () => {
     db.failNext = 1;
     await expect(recordSignIn("a@gmail.com", "A")).rejects.toThrow("network");
     await recordSignIn("a@gmail.com", "A");
-    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "alter", "create", "create", "create", "create", "create", "insert"]);
+    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "alter", "create", "create", "alter", "create", "create", "create", "insert"]);
   });
 
   it("saves a profile as JSON and only returns a valid one", async () => {

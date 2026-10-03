@@ -6,6 +6,8 @@ export const EVENT_KINDS = {
   signin: "signed in",
   goal: "saved a goal",
   comment: "commented",
+  reply: "replied to a comment",
+  comment_edited: "edited a comment",
   comment_deleted: "deleted a comment",
   reaction: "reacted",
   unreaction: "took back a reaction",
@@ -74,7 +76,7 @@ export async function commentsOverview(): Promise<{ comments: AdminComment[]; re
   const [rows, given] = await Promise.all([
     q`select c.id, c.race_id, c.email, c.name, c.body, c.created_at,
         coalesce((select jsonb_object_agg(emoji, n) from (select emoji, count(*)::int as n from comment_reactions where comment_id = c.id group by emoji) x), '{}'::jsonb) as counts
-      from comments c order by c.created_at desc, c.id desc`,
+      from comments c where not c.deleted order by c.created_at desc, c.id desc`,
     q`select email, count(*)::int as n from comment_reactions group by email`,
   ]);
   return {

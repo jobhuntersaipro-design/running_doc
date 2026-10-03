@@ -61,18 +61,19 @@ export default async function AdminPage(props: PageProps<"/admin">) {
     races.map((r) => {
       const goals = data.runners.filter((u) => u.goals[r.id]).length;
       const comments = data.comments.filter((c) => c.raceId === r.id);
-      return [r.id, `${goals} goals, ${comments.length} comments, ${comments.reduce((n, c) => n + sum(c.counts), 0)} reactions`];
+      return [r.id, { goals, comments: comments.length, reactions: comments.reduce((n, c) => n + sum(c.counts), 0) }];
     }),
   );
+  // eslint-disable-next-line react-hooks/purity -- a server render; counts "the last 7 days".
+  const weekAgo = Date.now() - WEEK;
   const rows: RunnerRow[] = data.runners.map((r) => ({
     ...r,
+    activity: Date.parse(r.signedUpAt) > weekAgo ? "New" : Date.parse(r.lastSignInAt) > weekAgo ? "Active" : "Inactive",
     goalCount: Object.keys(r.goals).length,
     raceCount: races.filter((x) => x.owner?.toLowerCase() === r.email).length,
     commentCount: data.comments.filter((c) => c.email === r.email).length,
     reactionCount: data.reactionsGiven[r.email] ?? 0,
   }));
-  // eslint-disable-next-line react-hooks/purity -- a server render; counts "the last 7 days".
-  const weekAgo = Date.now() - WEEK;
   const race = raceSel ? races.find((r) => r.id === raceSel) : undefined;
   const runner = runnerSel ? data.runners.find((r) => r.email === runnerSel) : undefined;
 
@@ -114,7 +115,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
           <div className={styles.metrics}>
             <MetricCard label="Runners" value={rows.length} context={`${rows.filter((r) => Date.parse(r.signedUpAt) > weekAgo).length} new in the last 7 days`} />
             <MetricCard label="Active" value={rows.filter((r) => Date.parse(r.lastSignInAt) > weekAgo).length} context="signed in during the last 7 days" />
-            <MetricCard label="Goals saved" value={rows.reduce((n, r) => n + r.goalCount, 0)} context={`by ${rows.filter((r) => r.goalCount).length} runners`} />
+            <MetricCard label="Goals saved" value={rows.reduce((n, r) => n + r.goalCount, 0)} context={`by ${rows.filter((r) => r.goalCount).length} of ${rows.length} runners`} />
             <MetricCard label="Comments" value={data.comments.length} context={`${data.comments.filter((c) => Date.parse(c.createdAt) > weekAgo).length} in the last 7 days`} />
           </div>
           {runnerSel && !runner ? <p className={styles.notice}>No runner with that email.</p> : null}

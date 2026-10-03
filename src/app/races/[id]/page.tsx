@@ -5,7 +5,7 @@ import { Planner } from "@/components/planner/planner";
 import { RaceComments } from "@/components/planner/race-comments";
 import { getRace } from "@/lib/courses";
 import { getUser } from "@/lib/server/auth";
-import { listComments } from "@/lib/server/comments";
+import { listComments, personId } from "@/lib/server/comments";
 import { getGoals } from "@/lib/server/runners";
 import { linkPreview } from "@/lib/server/link-preview";
 import { distanceName } from "@/lib/courses/distance";
@@ -42,8 +42,8 @@ async function savedGoalFor(id: string, email: string | undefined) {
 }
 
 /** Comments for the race, or null when there is no database or it fails. */
-async function commentsFor(id: string, viewer: Viewer | null) {
-  return listComments(id, viewer).catch((e) => {
+async function commentsFor(id: string) {
+  return listComments(id).catch((e) => {
     console.error("Reading comments failed:", e);
     return null;
   });
@@ -71,7 +71,7 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
     linkPreview((builtIn ?? stored!).officialUrl),
     distancesOf(id, user),
     savedGoalFor(id, user?.email),
-    commentsFor(id, user),
+    commentsFor(id),
   ]);
   return (
     <Planner
@@ -82,7 +82,7 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
       savedGoal={savedGoal}
       notice={noticeFor(await props.searchParams)}
     >
-      <RaceComments raceId={id} comments={comments} signedIn={!!user} />
+      <RaceComments raceId={id} comments={comments} me={user ? { id: personId(user.email), name: user.name } : null} />
     </Planner>
   );
 }

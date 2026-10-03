@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Avatar } from "@/components/arc/avatar/avatar";
 import { Timeline, type TimelineEvent } from "@/components/arc/timeline/timeline";
 import { formatClock, formatPace, type SavedGoal } from "@/lib/planner";
 import { EVENT_KINDS, type ActivityEvent, type AdminComment } from "@/lib/server/activity";
@@ -104,9 +105,12 @@ export function RunnerPanel({ runner, data, events }: { runner: Runner; data: Ad
   return (
     <section className={styles.panel} aria-labelledby="runner-heading" id="runner">
       <div className={styles.panelHead}>
-        <h2 id="runner-heading" className={styles.h2}>
-          {runner.name || runner.email}
-        </h2>
+        <span className={styles.who}>
+          <Avatar name={runner.name || runner.email} size="lg" />
+          <h2 id="runner-heading" className={styles.h2}>
+            {runner.name || runner.email}
+          </h2>
+        </span>
         <Link href="/admin?tab=runners" className={styles.ghostLink}>
           Close
         </Link>

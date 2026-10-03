@@ -29,6 +29,7 @@ export function db() {
       created_at timestamptz not null default now()
     )`)
     .then(() => sql`create index if not exists comments_race on comments (race_id, created_at)`)
+    .then(() => sql`alter table comments add column if not exists parent_id bigint, add column if not exists edited boolean not null default false, add column if not exists deleted boolean not null default false`)
     .then(() => sql`create table if not exists comment_reactions (
       comment_id bigint not null references comments (id) on delete cascade,
       email text not null,

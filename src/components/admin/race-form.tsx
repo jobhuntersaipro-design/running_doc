@@ -6,6 +6,7 @@ import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { Checkbox } from "@/components/arc/checkbox/checkbox";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
+import { Combobox } from "@/components/arc/combobox/combobox";
 import { FileDropzone } from "@/components/arc/file-dropzone/file-dropzone";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
@@ -29,6 +30,8 @@ function useObjectUrl(file: File | null) {
   return url;
 }
 
+const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name, keywords: [c.code] }));
+
 export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** Event names already in use, suggested so distances group under one event. */ events?: string[] }) {
   const [state, dispatch, pending] = useActionState<FormState, FormData>(saveRace, {});
   const [distance, setDistance] = useState<DistanceValue>(race?.distance ?? "half");
@@ -38,7 +41,7 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
   const [gpx, setGpx] = useState<File | null>(null);
   const [gpxInfo, setGpxInfo] = useState<{ km: number; picked: DistanceValue } | { error: string } | null>(null);
   const [place] = useState(() => (race ? { country: race.country ?? "", city: race.city ?? "", ...(race.country ? {} : splitLocation(race.location)) } : null));
-  const [country, setCountry] = useState(() => (place?.country ? (findCountry(place.country)?.name ?? "") : ""));
+  const [country, setCountry] = useState(() => (place?.country ? (findCountry(place.country)?.code ?? "") : ""));
   const [pdf, setPdf] = useState<File | null>(null);
   const [cover, setCover] = useState<File | null>(null);
   const [removeCover, setRemoveCover] = useState(false);
@@ -79,8 +82,7 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
     const fd = new FormData(e.currentTarget);
     if (race) fd.set("id", race.id);
     fd.set("distance", distance);
-    // Send the code when the name matches, so the server need not spell country names the way this browser does.
-    fd.set("country", findCountry(country)?.code ?? country);
+    fd.set("country", country);
     fd.set("customKm", customKm);
     fd.set("stations", JSON.stringify(stations));
     if (approximate) fd.set("stationsApproximate", "on");
@@ -143,22 +145,23 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
           />
         </div>
         <div className={styles.fieldRow}>
-          <Input
-            label="Country"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            placeholder="Malaysia"
-            description="Type to search the list."
-            list="countries"
-            autoComplete="off"
-            error={fe.country}
-            required
-          />
-          <datalist id="countries">
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.name} />
-            ))}
-          </datalist>
+          <div className={styles.fileField}>
+            <Combobox
+              label="Country"
+              options={COUNTRY_OPTIONS}
+              value={country}
+              onValueChange={setCountry}
+              placeholder="Search countries"
+              emptyMessage="No country matches"
+              aria-invalid={fe.country ? true : undefined}
+              required
+            />
+            {fe.country ? (
+              <p className={styles.fieldError} role="alert">
+                {fe.country}
+              </p>
+            ) : null}
+          </div>
           <Input label="City" name="city" defaultValue={place?.city} placeholder="Kuala Lumpur" autoComplete="address-level2" error={fe.city} required />
         </div>
         <Input

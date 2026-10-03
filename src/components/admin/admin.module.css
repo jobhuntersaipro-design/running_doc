@@ -207,24 +207,21 @@
   gap: var(--space-1);
 }
 
-/* One event, with a row per distance */
+/* A card per event that opens to its distances */
 
-.eventRow {
+.eventCards {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eventDetail {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   align-items: start;
   gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-}
-
-.eventRow + .eventRow {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.eventBody {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
 }
 
 .distanceList {
@@ -241,18 +238,42 @@
   padding: var(--space-2) 0;
 }
 
+.distanceRow:first-child {
+  padding-top: 0;
+}
+
 .distanceRow + .distanceRow {
   border-top: 1px solid var(--border-subtle);
 }
 
+.distanceHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eventDetail .thumb {
+  background: var(--surface);
+}
+
 .distanceName {
+  color: var(--foreground);
   font-size: var(--text-sm);
   font-weight: 500;
+  text-decoration: none;
+}
+
+.distanceName:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 560px) {
-  .eventRow {
-    grid-template-columns: 72px minmax(0, 1fr);
+  .eventDetail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .eventDetail .thumb {
+    width: 96px;
   }
   .distanceRow {
     grid-template-columns: minmax(0, 1fr);
@@ -471,7 +492,7 @@
 
 .panelHead {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -542,8 +563,21 @@
   }
 }
 
-.who {
+.runners {
   display: grid;
+  gap: var(--space-3);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 13rem;
+}
+
+.who > span:last-child {
+  display: grid;
+  min-width: 0;
 }
 
 .who small {

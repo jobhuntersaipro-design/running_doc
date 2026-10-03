@@ -2190,64 +2190,9 @@
 
 /* Comments */
 
-.comments {
-  display: grid;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.comment {
-  display: grid;
-  gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.commentHead,
-.commentBody {
-  margin: 0;
-}
-
-.commentBody {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.reactions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.reaction {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.reaction[aria-pressed="true"] {
-  border-color: var(--foreground);
-  color: var(--foreground);
-}
-
-.reaction:disabled {
-  cursor: default;
-}
-
-.commentForm {
-  display: grid;
-  gap: var(--space-2);
+/* Race comments are not resolved like a review thread, so the thread's Resolve button is hidden. */
+.thread [data-resolve] {
+  display: none;
 }
 
 /* Heat and humidity */
