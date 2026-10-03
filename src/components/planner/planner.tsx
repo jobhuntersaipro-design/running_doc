@@ -52,7 +52,7 @@ function goalError(seconds: number, km: number): string | null {
 
 /** A race from the overview: the course plus its event details. */
 export type PlannerRace = CourseInput &
-  Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files"> & { publishedBy?: string };
+  Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files"> & { publishedBy?: string; bib?: string };
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
 export function Planner({
@@ -181,7 +181,7 @@ export function Planner({
           </h1>
           <p className={styles.lede}>
             {race
-              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.${race.publishedBy ? ` Published by ${race.publishedBy}.` : ""}`
+              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.${race.publishedBy ? ` Published by ${race.publishedBy}.` : ""}${race.bib ? ` Your bib: ${race.bib}.` : ""}`
               : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
         </div>
