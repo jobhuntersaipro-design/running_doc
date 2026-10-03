@@ -29,7 +29,7 @@ export default async function MyRacesPage(props: PageProps<"/my">) {
     .sort((a, b) => b.goal.savedAt.localeCompare(a.goal.savedAt));
   const races = all
     .filter((r) => r.owner?.toLowerCase() === user.email.toLowerCase())
-    .map((r) => ({ ...r, builtIn: false }));
+    .map((r) => ({ ...r, km: r.officialKm, builtIn: false }));
   return (
     <AdminShell signedIn home="/my">
       <RaceDashboard

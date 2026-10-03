@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ImagePlus, Pencil, Plus } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { DeleteRace } from "./delete-race";
+import { eventKey } from "@/lib/server/races";
 import { PublishRace } from "./publish-race";
 import styles from "./admin.module.css";
 
@@ -11,6 +12,7 @@ interface Row {
   event: string;
   category: string;
   dateLabel: string;
+  km: number;
   coverUrl?: string;
   builtIn: boolean;
   owner?: string;
@@ -18,7 +20,7 @@ interface Row {
   bib?: string;
 }
 
-/** The race list in /admin (every race) and /my (a runner's own races). */
+/** The race list in /admin (every race) and /my (a runner's own races): one row per event, with each distance under it. */
 export function RaceDashboard({
   title,
   lede,
@@ -43,6 +45,12 @@ export function RaceDashboard({
   /** Shown under the heading, above the race list. */
   children?: ReactNode;
 }) {
+  const groups = new Map<string, Row[]>();
+  for (const r of races) {
+    const key = eventKey({ ...r, private: Boolean(r.owner) && !r.publishedBy });
+    groups.set(key, [...(groups.get(key) ?? []), r]);
+  }
+  const events = [...groups.values()].map((list) => list.sort((a, b) => a.km - b.km));
   return (
     <>
       <section className={styles.head}>
@@ -74,44 +82,56 @@ export function RaceDashboard({
       {races.length === 0 && empty ? <p className={styles.notice}>{empty}</p> : null}
 
       <ul className={styles.raceList} aria-label="Races" hidden={races.length === 0}>
-        {races.map((r) => (
-          <li key={r.id} className={styles.raceRow}>
-            <div className={styles.thumb}>
-              {r.coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.coverUrl} alt="" />
-              ) : (
-                <ImagePlus size={20} strokeWidth={1.75} aria-hidden="true" />
-              )}
-            </div>
-            <div className={styles.raceText}>
-              <Link href={`/races/${r.id}`} className={styles.raceName}>
-                {r.event}
-              </Link>
-              <span className={styles.raceMeta}>
-                {r.category}, {r.dateLabel}
-                {r.builtIn ? ", built in" : ""}
-                {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
-                {r.publishedBy ? `, published by ${r.publishedBy}` : r.owner ? ", private" : ""}
-                {r.bib && base === "/my" ? `, bib ${r.bib}` : ""}
-                {stats?.[r.id] ? `. ${stats[r.id]}` : ""}
-              </span>
-            </div>
-            <div className={styles.rowActions}>
-              {stats ? (
-                <Link href={`/admin?tab=races&race=${encodeURIComponent(r.id)}`} className={styles.ghostLink}>
-                  Details
+        {events.map((list) => {
+          const cover = list.find((r) => r.coverUrl)?.coverUrl;
+          return (
+            <li key={list[0].id} className={styles.eventRow}>
+              <div className={styles.thumb}>
+                {cover ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover} alt="" />
+                ) : (
+                  <ImagePlus size={20} strokeWidth={1.75} aria-hidden="true" />
+                )}
+              </div>
+              <div className={styles.eventBody}>
+                <Link href={`/races/${list[0].id}`} className={styles.raceName}>
+                  {list[0].event}
                 </Link>
-              ) : null}
-              <Link href={`${base}/races/${r.id}`} className={styles.ghostLink}>
-                {r.builtIn ? <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" /> : <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />}
-                {r.builtIn ? "Cover" : "Edit"}
-              </Link>
-              {r.owner ? <PublishRace id={r.id} published={Boolean(r.publishedBy)} /> : null}
-              {r.builtIn ? null : <DeleteRace id={r.id} name={r.event} />}
-            </div>
-          </li>
-        ))}
+                <ul className={styles.distanceList} aria-label={`Distances of ${list[0].event}`}>
+                  {list.map((r) => (
+                    <li key={r.id} className={styles.distanceRow}>
+                      <div className={styles.raceText}>
+                        <span className={styles.distanceName}>{r.category}</span>
+                        <span className={styles.raceMeta}>
+                          {r.dateLabel}
+                          {r.builtIn ? ", built in" : ""}
+                          {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
+                          {r.publishedBy ? `, published by ${r.publishedBy}` : r.owner ? ", private" : ""}
+                          {r.bib && base === "/my" ? `, bib ${r.bib}` : ""}
+                          {stats?.[r.id] ? `. ${stats[r.id]}` : ""}
+                        </span>
+                      </div>
+                      <div className={styles.rowActions}>
+                        {stats ? (
+                          <Link href={`/admin?tab=races&race=${encodeURIComponent(r.id)}`} className={styles.ghostLink}>
+                            Details
+                          </Link>
+                        ) : null}
+                        <Link href={`${base}/races/${r.id}`} className={styles.ghostLink}>
+                          {r.builtIn ? <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" /> : <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />}
+                          {r.builtIn ? "Cover" : "Edit"}
+                        </Link>
+                        {r.owner ? <PublishRace id={r.id} published={Boolean(r.publishedBy)} /> : null}
+                        {r.builtIn ? null : <DeleteRace id={r.id} name={`${r.event}, ${r.category}`} />}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </>
   );

@@ -260,6 +260,10 @@ export interface RaceEvent {
   publishedBy?: string;
 }
 
+/** Races with the same key are distances of one event: same name, and the same runner if private. */
+export const eventKey = (r: { event: string; private: boolean; owner?: string }) =>
+  `${r.private ? r.owner!.toLowerCase() : ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
+
 /**
  * Groups races by event name, so a 10K and a half marathon added under the same
  * event share one card. A runner's private races group on their own.
@@ -267,7 +271,7 @@ export interface RaceEvent {
 export function groupByEvent(races: RaceCard[]): RaceEvent[] {
   const groups = new Map<string, RaceCard[]>();
   for (const r of races) {
-    const key = `${r.private ? r.owner!.toLowerCase() : ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
+    const key = eventKey(r);
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return [...groups.entries()]

@@ -9,7 +9,7 @@ import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { LoginForm } from "@/components/admin/login-form";
 import { adminConfigured, getUser, isAdmin } from "@/lib/server/auth";
 import { commentsOverview, listEvents } from "@/lib/server/activity";
-import { getStoredRace, overviewRaces } from "@/lib/server/races";
+import { getStoredRace, groupByEvent, overviewRaces } from "@/lib/server/races";
 import { listRunners } from "@/lib/server/runners";
 import { checkStorage } from "@/lib/server/store";
 import styles from "@/components/admin/admin.module.css";
@@ -80,7 +80,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
     <AdminShell signedIn>
       <nav className={styles.tabs} aria-label="Admin sections">
         <Link href="/admin" className={styles.tab} aria-current={tab === "races" ? "page" : undefined}>
-          Races ({races.length})
+          Races ({groupByEvent(races).length})
         </Link>
         <Link href="/admin?tab=runners" className={styles.tab} aria-current={tab === "runners" ? "page" : undefined}>
           Runners ({data.runners.length})
