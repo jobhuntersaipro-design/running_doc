@@ -5,6 +5,7 @@ import { RaceDashboard } from "@/components/admin/race-dashboard";
 import { RunnersTable } from "@/components/admin/runners-table";
 import { LoginForm } from "@/components/admin/login-form";
 import { adminConfigured, getUser, isAdmin } from "@/lib/server/auth";
+import { formatClock } from "@/lib/planner";
 import { overviewRaces } from "@/lib/server/races";
 import { listRunners } from "@/lib/server/runners";
 import { checkStorage } from "@/lib/server/store";
@@ -40,6 +41,23 @@ export default async function AdminPage(props: PageProps<"/admin">) {
       return null;
     }),
   ]);
+  const rows = runners?.map((r) => {
+    const label = (id: string) => {
+      const c = races.find((x) => x.id === id);
+      return c ? `${c.event}, ${c.category}` : id;
+    };
+    const p = r.profile;
+    const profile = p && [p.age && `${p.age} y`, p.sex, p.heightCm && `${p.heightCm} cm`, p.weightKg && `${p.weightKg} kg`, p.vo2max && `VO2 max ${p.vo2max}`].filter(Boolean).join(", ");
+    return {
+      ...r,
+      goalCount: Object.keys(r.goals).length,
+      details: [
+        `Profile: ${profile || "not saved"}`,
+        ...Object.entries(r.goals).map(([id, g]) => `Goal: ${label(id)}, ${formatClock(g.goalSeconds)}, start ${g.startTime}`),
+        ...races.filter((x) => x.owner?.toLowerCase() === r.email).map((x) => `Added race: ${x.event}, ${x.category}`),
+      ],
+    };
+  });
   return (
     <AdminShell signedIn>
       <RaceDashboard
@@ -50,12 +68,12 @@ export default async function AdminPage(props: PageProps<"/admin">) {
         saved={Boolean(saved)}
         storage={storage}
       />
-      {runners ? (
+      {rows && runners ? (
         <section aria-labelledby="runners-heading">
           <h2 id="runners-heading" className={styles.h2}>
             Runners ({runners.length})
           </h2>
-          <RunnersTable runners={runners} />
+          <RunnersTable runners={rows} />
         </section>
       ) : null}
     </AdminShell>

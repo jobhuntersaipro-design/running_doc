@@ -37,14 +37,28 @@ export async function recordSignIn(email: string, name: string): Promise<void> {
     on conflict (email) do update set name = excluded.name, last_sign_in_at = now()`;
 }
 
-export type Runner = { email: string; name: string; signedUpAt: string };
+export type Runner = {
+  email: string;
+  name: string;
+  signedUpAt: string;
+  lastSignInAt: string;
+  profile: RunnerProfile | null;
+  goals: Record<string, SavedGoal>;
+};
 
 /** Every runner who has signed up, newest first, or null without a database. */
 export async function listRunners(): Promise<Runner[] | null> {
   const q = await db();
   if (!q) return null;
-  const rows = await q`select email, name, signed_up_at from runners order by signed_up_at desc`;
-  return rows.map((r) => ({ email: r.email, name: r.name, signedUpAt: new Date(r.signed_up_at).toISOString() }));
+  const rows = await q`select email, name, signed_up_at, last_sign_in_at, profile, goals from runners order by signed_up_at desc`;
+  return rows.map((r) => ({
+    email: r.email,
+    name: r.name,
+    signedUpAt: new Date(r.signed_up_at).toISOString(),
+    lastSignInAt: new Date(r.last_sign_in_at).toISOString(),
+    profile: isRunnerProfile(r.profile) ? r.profile : null,
+    goals: Object.fromEntries(Object.entries((r.goals ?? {}) as Record<string, unknown>).filter((e): e is [string, SavedGoal] => isSavedGoal(e[1]))),
+  }));
 }
 
 /** A runner's saved profile, or null without a database or before they save one. */
