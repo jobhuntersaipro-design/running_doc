@@ -15,6 +15,7 @@ interface Row {
   builtIn: boolean;
   owner?: string;
   publishedBy?: string;
+  bib?: string;
 }
 
 /** The race list in /admin (every race) and /my (a runner's own races). */
@@ -92,6 +93,7 @@ export function RaceDashboard({
                 {r.builtIn ? ", built in" : ""}
                 {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
                 {r.publishedBy ? `, published by ${r.publishedBy}` : r.owner ? ", private" : ""}
+                {r.bib && base === "/my" ? `, bib ${r.bib}` : ""}
                 {stats?.[r.id] ? `. ${stats[r.id]}` : ""}
               </span>
             </div>

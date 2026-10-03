@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getRace } from "@/lib/courses";
+import { findCountry } from "@/lib/countries";
 import { parseGpx, type Station } from "@/lib/planner";
 import { logEvent } from "@/lib/server/activity";
 import { endSession, getUser, isAdmin, startSession, verifyCredentials, type SessionUser } from "@/lib/server/auth";
@@ -139,7 +140,9 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
   const event = text(fd, "event");
   const category = text(fd, "category");
   const date = text(fd, "date");
-  const location = text(fd, "location");
+  const country = findCountry(text(fd, "country"));
+  const city = text(fd, "city");
+  const bib = text(fd, "bib");
   const officialUrl = text(fd, "officialUrl");
   const startTime = text(fd, "startTime");
   const distance = text(fd, "distance") as DistanceValue;
@@ -148,7 +151,9 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
   if (event.length < 3 || event.length > 120) fieldErrors.event = "Enter the event name, 3 to 120 characters.";
   if (category.length < 2 || category.length > 80) fieldErrors.category = "Enter the race category, for example Half marathon.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) fieldErrors.date = "Choose the race date.";
-  if (location.length < 2 || location.length > 120) fieldErrors.location = "Enter where the race is, for example Kuala Lumpur, Malaysia.";
+  if (!country) fieldErrors.country = "Choose the country from the list.";
+  if (city.length < 2 || city.length > 80) fieldErrors.city = "Enter the city, for example Kuala Lumpur.";
+  if (bib && !/^[\p{L}\p{N} -]{1,12}$/u.test(bib)) fieldErrors.bib = "Use up to 12 letters and numbers.";
   try {
     const u = new URL(officialUrl);
     if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
@@ -242,7 +247,10 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       category,
       date,
       dateLabel: dateLabelOf(date),
-      location,
+      location: `${city}, ${country!.name}`,
+      country: country!.code,
+      city,
+      bib: bib || undefined,
       officialUrl,
       distance,
       officialKm,

@@ -23,7 +23,13 @@ export interface StoredRace {
   /** "YYYY-MM-DD" */
   date: string;
   dateLabel: string;
+  /** "City, Country", shown on the card and the plan. */
   location: string;
+  /** ISO country code and city, kept apart for the form. Older races have only `location`. */
+  country?: string;
+  city?: string;
+  /** The runner's own bib number, shown only to them. */
+  bib?: string;
   officialUrl: string;
   distance: "5k" | "10k" | "half" | "full" | "custom";
   officialKm: number;
@@ -210,6 +216,8 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
 export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
   const r = await getStoredRace(id);
   if (!r || !canSee(r, viewer)) return null;
+  // The bib belongs to whoever added the race: the runner, or the admin for admin races.
+  const mine = viewer !== null && (r.owner ? r.owner.toLowerCase() === viewer.email.toLowerCase() : viewer.admin);
   const gpx = await readText(r.gpxUrl);
   return {
     id: r.id,
@@ -226,6 +234,7 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     officialUrl: r.officialUrl,
     files: filesOf(r),
     publishedBy: r.publishedBy,
+    bib: mine ? r.bib : undefined,
   };
 }
 
