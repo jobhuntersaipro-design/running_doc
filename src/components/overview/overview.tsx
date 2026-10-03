@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink, FileDown, Lock, Plus } from "lucide-react";
+import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
 import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
 import { RoutePreview } from "@/components/site/route-preview";
 import { LikeButton } from "@/components/site/like-button";
 import { SiteHeader } from "@/components/site/site-header";
+import { VisibilityBadge } from "@/components/site/visibility-badge";
 import { shortDistance } from "@/lib/courses/distance";
 import type { Likes } from "@/lib/server/likes";
 import { RUNNING_DOC, RUNNING_DOC_AVATAR, type RaceEvent } from "@/lib/server/races";
@@ -17,7 +17,18 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per event, with a ribbon for each distance. Opening a card shows its race plan. */
-export function Overview({ events, likes, signedIn }: { events: RaceEvent[]; /** By event key. */ likes: Record<string, Likes>; signedIn: boolean }) {
+export function Overview({
+  events,
+  likes,
+  viewerEmail,
+}: {
+  events: RaceEvent[];
+  /** By event key. */
+  likes: Record<string, Likes>;
+  /** The signed-in runner, if any. */
+  viewerEmail?: string;
+}) {
+  const signedIn = Boolean(viewerEmail);
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -54,12 +65,14 @@ export function Overview({ events, likes, signedIn }: { events: RaceEvent[]; /**
                   </div>
                 )}
                 <div className={styles.cardBody}>
-                  {e.private ? (
+                  {e.private || e.publishedBy ? (
                     <p className={styles.privacy}>
-                      <Badge tone="neutral" size="sm" icon={<Lock size={12} strokeWidth={1.75} />}>
-                        Private
-                      </Badge>
-                      Only you can see this
+                      <VisibilityBadge visibility={e.private ? "private" : "published"} />
+                      {!e.private
+                        ? "Everyone can see this"
+                        : r.owner?.toLowerCase() === viewerEmail?.toLowerCase()
+                          ? "Only you can see this"
+                          : `Only ${e.createdBy} and admins can see this`}
                     </p>
                   ) : null}
                   <p className={styles.date}>{e.dateLabel}</p>

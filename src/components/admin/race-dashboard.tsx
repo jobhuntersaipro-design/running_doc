@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ImagePlus, Pencil, Plus } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
-import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { ExpandableCard } from "@/components/arc/expandable-card/expandable-card";
+import { VisibilityBadge, visibilityOf } from "@/components/site/visibility-badge";
 import { DeleteRace } from "./delete-race";
 import { eventKey } from "@/lib/server/races";
 import { PublishRace } from "./publish-race";
@@ -34,18 +34,11 @@ export interface RaceStats {
 const shortDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
-/** Who can see a race, as a badge. */
-function status(r: Row): { tone: BadgeTone; label: string } {
-  if (r.builtIn) return { tone: "info", label: "Built in" };
-  if (!r.owner) return { tone: "success", label: "Public" };
-  return r.publishedBy ? { tone: "success", label: "Published" } : { tone: "neutral", label: "Private" };
-}
-
 /** One line under an event's name: distances, days and, for the admin, engagement. */
 function summary(list: Row[], stats?: Record<string, RaceStats>, likes = 0): string {
   const days = list.map((r) => r.date).filter((d): d is string => Boolean(d)).sort();
   const when = days.length ? shortDate.formatRange(new Date(days[0]), new Date(days[days.length - 1])) : list[0].dateLabel;
-  const hidden = list.filter((r) => status(r).label === "Private").length;
+  const hidden = list.filter((r) => visibilityOf(r) === "private").length;
   let text = `${plural(list.length, "distance")}, ${when}${hidden ? `, ${hidden} private` : ""}`;
   if (stats) {
     const sum = (k: keyof RaceStats) => list.reduce((n, r) => n + (stats[r.id]?.[k] ?? 0), 0);
@@ -141,7 +134,6 @@ export function RaceDashboard({
                   </div>
                   <ul className={styles.distanceList} aria-label={`Distances of ${list[0].event}`}>
                     {list.map((r) => {
-                      const { tone, label } = status(r);
                       const s = stats?.[r.id];
                       return (
                         <li key={r.id} className={styles.distanceRow}>
@@ -150,9 +142,7 @@ export function RaceDashboard({
                               <Link href={`/races/${r.id}`} className={styles.distanceName}>
                                 {r.category}
                               </Link>
-                              <Badge tone={tone} size="sm">
-                                {label}
-                              </Badge>
+                              <VisibilityBadge visibility={visibilityOf(r)} />
                             </span>
                             <span className={styles.raceMeta}>
                               {r.dateLabel}

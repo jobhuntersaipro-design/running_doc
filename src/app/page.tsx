@@ -15,5 +15,5 @@ export default async function Home() {
       return {};
     }),
   ]);
-  return <Overview events={groupByEvent(races)} likes={likes} signedIn={Boolean(user)} />;
+  return <Overview events={groupByEvent(races)} likes={likes} viewerEmail={user?.email} />;
 }

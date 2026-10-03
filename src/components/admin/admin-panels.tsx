@@ -7,6 +7,7 @@ import { isAdminEmail } from "@/lib/server/auth";
 import type { Likes } from "@/lib/server/likes";
 import { eventKey, RUNNING_DOC, type RaceCard, type StoredRace } from "@/lib/server/races";
 import type { Runner } from "@/lib/server/runners";
+import { VisibilityBadge, visibilityOf } from "@/components/site/visibility-badge";
 import { DeleteComment } from "./delete-comment";
 import styles from "./admin.module.css";
 
@@ -145,10 +146,12 @@ export function RunnerPanel({ runner, data, events }: { runner: Runner; data: Ad
         <ul className={styles.plainList}>
           {races.map((r) => (
             <li key={r.id}>
-              <Link href={raceHref(r.id)}>
-                {r.event}, {r.category}
-              </Link>
-              : {r.private ? "private" : `published as ${r.publishedBy}`}
+              <span className={styles.distanceHead}>
+                <Link href={raceHref(r.id)}>
+                  {r.event}, {r.category}
+                </Link>
+                <VisibilityBadge visibility={visibilityOf(r)} />
+              </span>
             </li>
           ))}
         </ul>
@@ -196,11 +199,14 @@ export function RacePanel({ race, stored, data, events }: { race: RaceCard; stor
           ["Source", source],
           [
             "Visibility",
-            race.private
-              ? "Private to its runner"
-              : stored?.publishedAt
-                ? `Published by ${stored.publishedBy} on ${dayTime.format(new Date(stored.publishedAt))}`
-                : "Public",
+            <span key="v" className={styles.distanceHead}>
+              <VisibilityBadge visibility={visibilityOf(race)} />
+              {race.private
+                ? "Only its runner and admins can see it"
+                : stored?.publishedAt
+                  ? `By ${stored.publishedBy} on ${dayTime.format(new Date(stored.publishedAt))}`
+                  : "Everyone can see it"}
+            </span>,
           ],
           ...(stored ? [["Last changed", dayTime.format(new Date(stored.updatedAt))] as [string, string]] : []),
           ["Links", <span key="l" className={styles.linkRow}><Link href={`/races/${race.id}`}>Race page</Link>{race.officialUrl ? <a href={race.officialUrl}>Official site</a> : null}{race.files.map((f) => <a key={f.href} href={f.href}>{f.label}</a>)}</span>],
