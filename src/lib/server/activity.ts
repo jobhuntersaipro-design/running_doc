@@ -11,6 +11,8 @@ export const EVENT_KINDS = {
   comment_deleted: "deleted a comment",
   reaction: "reacted",
   unreaction: "took back a reaction",
+  race_liked: "liked a race",
+  race_unliked: "took back a like",
   race_added: "added a race",
   race_edited: "edited a race",
   race_published: "published a race",

@@ -7,7 +7,8 @@ import { MAX_COMMENT, REACTIONS, type Reaction } from "@/lib/comments";
 import { getUser, type SessionUser } from "@/lib/server/auth";
 import { logEvent } from "@/lib/server/activity";
 import { addComment, deleteComment, editComment, toggleReaction } from "@/lib/server/comments";
-import { canSee, getStoredRace } from "@/lib/server/races";
+import { toggleLike } from "@/lib/server/likes";
+import { canSee, getStoredRace, groupByEvent, overviewRaces } from "@/lib/server/races";
 import { saveGoal as storeGoal } from "@/lib/server/runners";
 
 /** Built-in races are public; stored ones follow canSee. */
@@ -100,5 +101,19 @@ export async function removeComment(raceId: string, commentId: string): Promise<
   await logEvent(user.email, "comment_deleted", raceId, gone.email === user.email.toLowerCase() ? gone.body : `by ${gone.email}: ${gone.body}`);
   revalidatePath(`/races/${raceId}`);
   if (user.admin) revalidatePath("/admin");
+  return {};
+}
+
+/** Likes the event this race belongs to, or takes the like back. Runners must be signed in. */
+export async function likeRace(raceId: string): Promise<CommentResult> {
+  const user = await getUser();
+  if (!user) return { error: "Sign in to like races." };
+  const event = groupByEvent(await overviewRaces(user).catch(() => [])).find((e) => e.races.some((r) => r.id === raceId));
+  if (!event) return { error: "This race no longer exists." };
+  const liked = await toggleLike(event.key, user.email).catch(failed("Liking race"));
+  if (liked === null) return { error: "Your like could not be saved. Try again in a moment." };
+  await logEvent(user.email, liked ? "race_liked" : "race_unliked", raceId, event.event);
+  revalidatePath("/");
+  revalidatePath(`/races/${raceId}`);
   return {};
 }

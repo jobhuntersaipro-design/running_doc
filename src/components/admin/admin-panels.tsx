@@ -3,7 +3,9 @@ import { Avatar } from "@/components/arc/avatar/avatar";
 import { Timeline, type TimelineEvent } from "@/components/arc/timeline/timeline";
 import { formatClock, formatPace, type SavedGoal } from "@/lib/planner";
 import { EVENT_KINDS, type ActivityEvent, type AdminComment } from "@/lib/server/activity";
-import type { RaceCard, StoredRace } from "@/lib/server/races";
+import { isAdminEmail } from "@/lib/server/auth";
+import type { Likes } from "@/lib/server/likes";
+import { eventKey, RUNNING_DOC, type RaceCard, type StoredRace } from "@/lib/server/races";
 import type { Runner } from "@/lib/server/runners";
 import { DeleteComment } from "./delete-comment";
 import styles from "./admin.module.css";
@@ -21,6 +23,8 @@ export interface AdminData {
   runners: Runner[];
   comments: AdminComment[];
   reactionsGiven: Record<string, number>;
+  /** By event key. */
+  likes: Record<string, Likes>;
 }
 
 const raceOf = (data: AdminData, id: string | null) => data.races.find((r) => r.id === id);
@@ -28,7 +32,7 @@ const raceName = (data: AdminData, id: string) => {
   const r = raceOf(data, id);
   return r ? `${r.event}, ${r.category}` : `${id} (deleted)`;
 };
-const nameOf = (data: AdminData, email: string) => data.runners.find((r) => r.email === email)?.name || email;
+const nameOf = (data: AdminData, email: string) => (isAdminEmail(email) ? RUNNING_DOC : data.runners.find((r) => r.email === email)?.name || email);
 const reactionText = (counts: Record<string, number>) =>
   Object.entries(counts)
     .map(([emoji, n]) => `${emoji} ${n}`)
@@ -62,7 +66,7 @@ function CommentList({ comments, data, show }: { comments: AdminComment[]; data:
               {show === "race" ? (
                 <Link href={raceHref(c.raceId)}>{raceName(data, c.raceId)}</Link>
               ) : (
-                <Link href={runnerHref(c.email)}>{c.name || c.email}</Link>
+                <Link href={runnerHref(c.email)}>{nameOf(data, c.email)}</Link>
               )}
               , {dayTime.format(new Date(c.createdAt))}
               {Object.keys(c.counts).length ? `. ${reactionText(c.counts)}` : ""}
@@ -200,7 +204,7 @@ export function RacePanel({ race, stored, data, events }: { race: RaceCard; stor
           ],
           ...(stored ? [["Last changed", dayTime.format(new Date(stored.updatedAt))] as [string, string]] : []),
           ["Links", <span key="l" className={styles.linkRow}><Link href={`/races/${race.id}`}>Race page</Link>{race.officialUrl ? <a href={race.officialUrl}>Official site</a> : null}{race.files.map((f) => <a key={f.href} href={f.href}>{f.label}</a>)}</span>],
-          ["Engagement", `${goals.length} runners set a goal, ${comments.length} comments, ${reactions} reactions`],
+          ["Engagement", `${data.likes[eventKey(race)]?.count ?? 0} likes on the event, ${goals.length} runners set a goal, ${comments.length} comments, ${reactions} reactions`],
         ]}
       />
       <h3 className={styles.h3}>Runners&apos; goals</h3>

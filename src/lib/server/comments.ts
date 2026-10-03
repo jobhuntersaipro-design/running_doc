@@ -2,6 +2,8 @@ import "server-only";
 import { createHmac } from "node:crypto";
 import type { ThreadComment } from "@/components/arc/comment-thread/comment-thread";
 import { toThread, type Reaction } from "../comments";
+import { isAdminEmail } from "./auth";
+import { RUNNING_DOC, RUNNING_DOC_AVATAR } from "./races";
 import { db } from "./runners";
 
 const key = (email: string) => email.trim().toLowerCase();
@@ -10,7 +12,7 @@ const key = (email: string) => email.trim().toLowerCase();
 export const personId = (email: string) =>
   createHmac("sha256", process.env.AUTH_SECRET || "running-doc").update(key(email)).digest("base64url").slice(0, 16);
 
-/** A race's comments as a thread, oldest first, with who reacted. Null without a database. */
+/** A race's comments as a thread, oldest first, with who reacted. The admin's comments show as Running Doc. Null without a database. */
 export async function listComments(raceId: string): Promise<ThreadComment[] | null> {
   const q = await db();
   if (!q) return null;
@@ -22,7 +24,7 @@ export async function listComments(raceId: string): Promise<ThreadComment[] | nu
       id: String(r.id),
       parentId: r.parent_id === null ? null : String(r.parent_id),
       authorId: personId(r.email),
-      name: r.name,
+      ...(isAdminEmail(r.email) ? { name: RUNNING_DOC, avatar: RUNNING_DOC_AVATAR } : { name: r.name }),
       body: r.body,
       createdAt: new Date(r.created_at).toISOString(),
       edited: r.edited,

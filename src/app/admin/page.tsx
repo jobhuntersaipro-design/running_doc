@@ -9,6 +9,7 @@ import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { LoginForm } from "@/components/admin/login-form";
 import { adminConfigured, getUser, isAdmin } from "@/lib/server/auth";
 import { commentsOverview, listEvents } from "@/lib/server/activity";
+import { likeCounts } from "@/lib/server/likes";
 import { getStoredRace, groupByEvent, overviewRaces } from "@/lib/server/races";
 import { listRunners } from "@/lib/server/runners";
 import { checkStorage } from "@/lib/server/store";
@@ -47,15 +48,16 @@ export default async function AdminPage(props: PageProps<"/admin">) {
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const raceSel = one(raceId);
   const runnerSel = one(runnerEmail)?.toLowerCase();
-  const [races, storage, runners, talk, events, stored] = await Promise.all([
+  const [races, storage, runners, talk, events, stored, likes] = await Promise.all([
     overviewRaces(await getUser()),
     checkStorage(),
     listRunners().catch(logged<Awaited<ReturnType<typeof listRunners>>>("Listing runners")),
     commentsOverview().catch(logged<Awaited<ReturnType<typeof commentsOverview>>>("Listing comments")),
     listEvents(raceSel ? { raceId: raceSel } : runnerSel ? { email: runnerSel } : {}).catch(logged<Awaited<ReturnType<typeof listEvents>>>("Listing activity")),
     raceSel ? getStoredRace(raceSel).catch(() => null) : null,
+    likeCounts().catch(logged<Awaited<ReturnType<typeof likeCounts>>>("Reading likes")),
   ]);
-  const data: AdminData = { races, runners: runners ?? [], comments: talk?.comments ?? [], reactionsGiven: talk?.reactionsGiven ?? {} };
+  const data: AdminData = { races, runners: runners ?? [], comments: talk?.comments ?? [], reactionsGiven: talk?.reactionsGiven ?? {}, likes: likes ?? {} };
 
   const stats = Object.fromEntries(
     races.map((r) => {
@@ -101,6 +103,7 @@ export default async function AdminPage(props: PageProps<"/admin">) {
             storage={storage}
             stats={stats}
             published={one(published)}
+            likes={Object.fromEntries(Object.entries(data.likes).map(([k, v]) => [k, v.count]))}
           />
         </>
       ) : !runners ? (

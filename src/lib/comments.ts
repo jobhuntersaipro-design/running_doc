@@ -12,6 +12,7 @@ export interface CommentRow {
   parentId: string | null;
   authorId: string;
   name: string;
+  avatar?: string;
   body: string;
   /** ISO time */
   createdAt: string;
@@ -33,7 +34,7 @@ export function toThread(rows: CommentRow[]): ThreadComment[] {
   for (const r of rows)
     nodes.set(r.id, {
       id: r.id,
-      author: { id: r.authorId, name: r.name || "Runner" },
+      author: { id: r.authorId, name: r.name || "Runner", avatar: r.avatar },
       body: r.deleted ? "" : r.body,
       createdAt: when.format(new Date(r.createdAt)),
       edited: r.edited || undefined,

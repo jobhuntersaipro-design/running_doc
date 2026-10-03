@@ -90,6 +90,8 @@ export interface Viewer {
 }
 
 export const RUNNING_DOC = "Running Doc";
+/** The app icon, the avatar for Running Doc. */
+export const RUNNING_DOC_AVATAR = "/apple-icon.png";
 
 export const canSee = (r: StoredRace, viewer: Viewer | null) =>
   !r.owner || r.publishedAt !== undefined || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));

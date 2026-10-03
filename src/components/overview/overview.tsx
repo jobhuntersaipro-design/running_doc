@@ -3,9 +3,11 @@ import { ArrowRight, ExternalLink, FileDown, Lock, Plus } from "lucide-react";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge } from "@/components/arc/badge/badge";
 import { RoutePreview } from "@/components/site/route-preview";
+import { LikeButton } from "@/components/site/like-button";
 import { SiteHeader } from "@/components/site/site-header";
 import { shortDistance } from "@/lib/courses/distance";
-import { RUNNING_DOC, type RaceEvent } from "@/lib/server/races";
+import type { Likes } from "@/lib/server/likes";
+import { RUNNING_DOC, RUNNING_DOC_AVATAR, type RaceEvent } from "@/lib/server/races";
 import styles from "./overview.module.css";
 
 function startLabel(hhmm?: string) {
@@ -15,7 +17,7 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per event, with a ribbon for each distance. Opening a card shows its race plan. */
-export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: boolean }) {
+export function Overview({ events, likes, signedIn }: { events: RaceEvent[]; /** By event key. */ likes: Record<string, Likes>; signedIn: boolean }) {
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -68,7 +70,7 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                     {single && startLabel(r.startTime) ? `, ${startLabel(r.startTime)}` : ""}
                   </p>
                   <p className={styles.byline}>
-                    <Avatar name={e.createdBy} src={e.createdBy === RUNNING_DOC ? "/apple-icon.png" : undefined} size="sm" />
+                    <Avatar name={e.createdBy} src={e.createdBy === RUNNING_DOC ? RUNNING_DOC_AVATAR : undefined} size="sm" />
                     {e.publishedBy ? "Published" : "Created"} by {e.createdBy}
                   </p>
                   <span className={styles.open}>
@@ -103,6 +105,9 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                       </li>
                     ))
                   : null}
+                <li className={styles.likeItem}>
+                  <LikeButton raceId={r.id} event={e.event} likes={likes[e.key] ?? { count: 0, mine: false }} signedIn={signedIn} />
+                </li>
               </ul>
             </li>
           );

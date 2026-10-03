@@ -42,14 +42,14 @@ function status(r: Row): { tone: BadgeTone; label: string } {
 }
 
 /** One line under an event's name: distances, days and, for the admin, engagement. */
-function summary(list: Row[], stats?: Record<string, RaceStats>): string {
+function summary(list: Row[], stats?: Record<string, RaceStats>, likes = 0): string {
   const days = list.map((r) => r.date).filter((d): d is string => Boolean(d)).sort();
   const when = days.length ? shortDate.formatRange(new Date(days[0]), new Date(days[days.length - 1])) : list[0].dateLabel;
   const hidden = list.filter((r) => status(r).label === "Private").length;
   let text = `${plural(list.length, "distance")}, ${when}${hidden ? `, ${hidden} private` : ""}`;
   if (stats) {
     const sum = (k: keyof RaceStats) => list.reduce((n, r) => n + (stats[r.id]?.[k] ?? 0), 0);
-    text += `. ${plural(sum("goals"), "goal")}, ${plural(sum("comments"), "comment")}`;
+    text += `. ${plural(likes, "like")}, ${plural(sum("goals"), "goal")}, ${plural(sum("comments"), "comment")}`;
   }
   return text;
 }
@@ -65,6 +65,7 @@ export function RaceDashboard({
   empty,
   stats,
   published,
+  likes,
   children,
 }: {
   title: string;
@@ -79,6 +80,8 @@ export function RaceDashboard({
   stats?: Record<string, RaceStats>;
   /** Id of a race that was just published, to confirm it with a toast. */
   published?: string;
+  /** Admin only: likes per event key. */
+  likes?: Record<string, number>;
   /** Shown under the heading, above the race list. */
   children?: ReactNode;
 }) {
@@ -88,7 +91,7 @@ export function RaceDashboard({
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   const justPublished = published ? races.find((r) => r.id === published) : undefined;
-  const events = [...groups.values()].map((list) => list.sort((a, b) => a.km - b.km));
+  const events = [...groups.entries()].map(([key, list]) => ({ key, list: list.sort((a, b) => a.km - b.km) }));
   return (
     <>
       <section className={styles.head}>
@@ -122,11 +125,11 @@ export function RaceDashboard({
       {races.length === 0 && empty ? <p className={styles.notice}>{empty}</p> : null}
 
       <ul className={styles.eventCards} aria-label="Races" hidden={races.length === 0}>
-        {events.map((list) => {
+        {events.map(({ key, list }) => {
           const cover = list.find((r) => r.coverUrl)?.coverUrl;
           return (
             <li key={list[0].id}>
-              <ExpandableCard title={list[0].event} description={summary(list, stats)}>
+              <ExpandableCard title={list[0].event} description={summary(list, stats, likes?.[key])}>
                 <div className={styles.eventDetail}>
                   <div className={styles.thumb}>
                     {cover ? (

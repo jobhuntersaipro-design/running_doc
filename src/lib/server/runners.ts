@@ -45,6 +45,12 @@ export function db() {
       detail text not null default ''
     )`)
     .then(() => sql`create index if not exists events_at on events (at desc)`)
+    .then(() => sql`create table if not exists race_likes (
+      event_key text not null,
+      email text not null,
+      created_at timestamptz not null default now(),
+      primary key (event_key, email)
+    )`)
     .catch((e) => {
       ready = null;
       throw e;
