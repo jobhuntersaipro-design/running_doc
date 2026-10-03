@@ -47,6 +47,8 @@ export interface StoredRace {
   /** Set when a runner publishes their race for everyone: the name shown as "published by". */
   publishedBy?: string;
   publishedAt?: number;
+  /** When runners were emailed about it. Set once, so publishing again does not email them again. */
+  announcedAt?: number;
   updatedAt: number;
 }
 

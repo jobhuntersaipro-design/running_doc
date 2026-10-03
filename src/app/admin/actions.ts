@@ -1,11 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getRace } from "@/lib/courses";
 import { findCountry } from "@/lib/countries";
 import { parseGpx, type Station } from "@/lib/planner";
 import { logEvent } from "@/lib/server/activity";
+import { announceRace } from "@/lib/server/announce";
 import { endSession, getUser, isAdmin, startSession, verifyCredentials, type SessionUser } from "@/lib/server/auth";
 import {
   cardFacts,
@@ -14,6 +17,7 @@ import {
   getStoredRace,
   listRaces,
   publishedTwin,
+  RUNNING_DOC,
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
@@ -41,6 +45,14 @@ const owns = (user: SessionUser, race: StoredRace) => user.admin || race.owner?.
 const homeOf = (user: SessionUser) => (user.admin ? "/admin" : "/my");
 /** ponytail: flat cap per runner, add quotas by storage size if R2 costs matter. */
 const MAX_RACES_PER_RUNNER = 20;
+
+/** Emails runners about a newly public race once the response is sent, so publishing never waits on email. */
+async function announceLater(race: Parameters<typeof announceRace>[0], user: SessionUser, alsoSkip: (string | undefined)[]) {
+  const h = await headers();
+  const site = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+  const except = [user.email, ...alsoSkip.filter((e): e is string => Boolean(e))];
+  after(() => announceRace(race, site, user.email, except).catch((e) => console.error("Announcing race failed:", e)));
+}
 
 function storageError(e: unknown): FormState {
   if (e instanceof StorageNotReadyError || e instanceof StorageError) return { error: e.message };
@@ -265,10 +277,13 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       ownerName: existing ? existing.ownerName : user.admin ? undefined : user.name,
       publishedBy: existing?.publishedBy,
       publishedAt: existing?.publishedAt,
+      announcedAt: existing ? existing.announcedAt : user.admin ? Date.now() : undefined,
       updatedAt: Date.now(),
     };
     await saveRecord(record);
     await logEvent(user.email, existing ? "race_edited" : "race_added", id, `${event}, ${category}`);
+    // The admin's new races are public at once, so runners hear about them like a published race.
+    if (!existing && user.admin) await announceLater({ ...record, publishedBy: RUNNING_DOC }, user, []);
     await deleteFiles(replaced);
     revalidatePath("/");
     revalidatePath(`/races/${id}`);
@@ -321,8 +336,10 @@ export async function publishRace(id: string): Promise<FormState> {
     if (!twin) {
       // The admin publishing a runner's race credits the runner, not "Admin".
       const by = user.admin ? (race.ownerName ?? race.owner.split("@")[0]) : user.name;
-      await saveRecord({ ...race, publishedBy: by, publishedAt: Date.now(), updatedAt: Date.now() });
+      const published = { ...race, publishedBy: by, publishedAt: Date.now(), announcedAt: race.announcedAt ?? Date.now(), updatedAt: Date.now() };
+      await saveRecord(published);
       await logEvent(user.email, "race_published", id, `${race.event}, ${race.category}`);
+      if (!race.announcedAt) await announceLater({ ...published, publishedBy: by }, user, [race.owner]);
     }
   } catch (e) {
     return storageError(e);

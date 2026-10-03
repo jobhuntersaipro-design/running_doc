@@ -51,6 +51,7 @@ export function db() {
       created_at timestamptz not null default now(),
       primary key (event_key, email)
     )`)
+    .then(() => sql`alter table runners add column if not exists race_emails boolean not null default true`)
     .catch((e) => {
       ready = null;
       throw e;
@@ -124,4 +125,28 @@ export async function saveGoal(email: string, name: string, raceId: string, goal
   await q`insert into runners (email, name, goals) values (${key(email)}, ${name}, jsonb_build_object(${raceId}::text, ${JSON.stringify(goal)}::jsonb))
     on conflict (email) do update set goals = runners.goals || excluded.goals`;
   return true;
+}
+
+/** Runners who get an email when a race is published, leaving out these emails. Empty without a database. */
+export async function raceEmailRecipients(except: string[]): Promise<{ email: string; name: string }[]> {
+  const q = await db();
+  if (!q) return [];
+  const rows = await q`select email, name from runners where race_emails and not (email = any(${except.map(key)}::text[]))`;
+  return rows.map((r) => ({ email: r.email, name: r.name }));
+}
+
+/** Whether the runner gets new-race emails. Null without a database or for an unknown runner. */
+export async function getRaceEmails(email: string): Promise<boolean | null> {
+  const q = await db();
+  if (!q) return null;
+  const [row] = await q`select race_emails from runners where email = ${key(email)}`;
+  return row ? row.race_emails : null;
+}
+
+/** Turns new-race emails on or off. Resolves false without a database or for an unknown runner. */
+export async function setRaceEmails(email: string, on: boolean): Promise<boolean> {
+  const q = await db();
+  if (!q) return false;
+  const rows = await q`update runners set race_emails = ${on} where email = ${key(email)} returning email`;
+  return rows.length > 0;
 }
