@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { Alert } from "@/components/arc/alert/alert";
 import { Planner } from "@/components/planner/planner";
+import { RaceComments } from "@/components/planner/race-comments";
 import { getRace } from "@/lib/courses";
 import { getUser } from "@/lib/server/auth";
+import { listComments } from "@/lib/server/comments";
 import { getGoals } from "@/lib/server/runners";
 import { linkPreview } from "@/lib/server/link-preview";
 import { distanceName } from "@/lib/courses/distance";
@@ -38,22 +41,55 @@ async function savedGoalFor(id: string, email: string | undefined) {
   return goals[id] ?? null;
 }
 
+/** Comments for the race, or null when there is no database or it fails. */
+async function commentsFor(id: string, viewer: Viewer | null) {
+  return listComments(id, viewer).catch((e) => {
+    console.error("Reading comments failed:", e);
+    return null;
+  });
+}
+
+/** Why the runner landed here after publishing. */
+function noticeFor(query: Record<string, string | string[] | undefined>) {
+  if (query.duplicate)
+    return (
+      <Alert tone="warning" title="This race is already published">
+        Your race was not published, so there is one page for everyone. Plan and comment here instead.
+      </Alert>
+    );
+  if (query.published)
+    return (
+      <Alert tone="success" title="Published">
+        Everyone can see this race now, with your name on it.
+      </Alert>
+    );
+  return null;
+}
+
 export default async function RacePage(props: PageProps<"/races/[id]">) {
   const { id } = await props.params;
   if (id === "custom") return <Planner race={null} />;
   const user = await getUser();
-  const race = getRace(id);
-  if (race) {
-    const [gpx, officialPreview, distances, savedGoal] = await Promise.all([
-      builtInGpx(race),
-      linkPreview(race.officialUrl),
-      distancesOf(id, user),
-      savedGoalFor(id, user?.email),
-    ]);
-    return <Planner race={{ ...race, gpx }} officialPreview={officialPreview} distances={distances} signedIn={!!user} savedGoal={savedGoal} />;
-  }
-  const stored = await storedRaceForPlanner(id, user).catch(() => null);
-  if (!stored) notFound();
-  const [officialPreview, distances, savedGoal] = await Promise.all([linkPreview(stored.officialUrl), distancesOf(id, user), savedGoalFor(id, user?.email)]);
-  return <Planner race={stored} officialPreview={officialPreview} distances={distances} signedIn={!!user} savedGoal={savedGoal} />;
+  const builtIn = getRace(id);
+  const stored = builtIn ? null : await storedRaceForPlanner(id, user).catch(() => null);
+  if (!builtIn && !stored) notFound();
+  const [race, officialPreview, distances, savedGoal, comments] = await Promise.all([
+    builtIn ? builtInGpx(builtIn).then((gpx) => ({ ...builtIn, gpx })) : stored!,
+    linkPreview((builtIn ?? stored!).officialUrl),
+    distancesOf(id, user),
+    savedGoalFor(id, user?.email),
+    commentsFor(id, user),
+  ]);
+  return (
+    <Planner
+      race={race}
+      officialPreview={officialPreview}
+      distances={distances}
+      signedIn={!!user}
+      savedGoal={savedGoal}
+      notice={noticeFor(await props.searchParams)}
+    >
+      <RaceComments raceId={id} comments={comments} signedIn={!!user} />
+    </Planner>
+  );
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { RACES, getRace } from "@/lib/courses";
+import { sameRace } from "@/lib/courses/distance";
 import type { RaceFile, RaceMeta } from "@/lib/courses/types";
 import { buildPlan, routePreview, type Station } from "@/lib/planner";
 import { deleteFiles, listFiles, readText, saveFile } from "./store";
@@ -33,8 +34,11 @@ export interface StoredRace {
   pdfUrl?: string;
   coverUrl?: string;
   facts: CardFacts;
-  /** Email of the runner who added it. Their races are private to them; admin races have no owner and are public. */
+  /** Email of the runner who added it. Their races are private to them until published; admin races have no owner and are public. */
   owner?: string;
+  /** Set when a runner publishes their race for everyone: the name shown as "published by". */
+  publishedBy?: string;
+  publishedAt?: number;
   updatedAt: number;
 }
 
@@ -62,9 +66,10 @@ export interface RaceCard extends CardFacts {
   km: number;
   coverUrl?: string;
   builtIn: boolean;
-  /** Added by a runner, so only they (and the admin) can see it. */
+  /** Added by a runner and not published, so only they (and the admin) can see it. */
   private: boolean;
   owner?: string;
+  publishedBy?: string;
 }
 
 /** Who is looking: private races show only to their owner, or to the admin. */
@@ -74,7 +79,7 @@ export interface Viewer {
 }
 
 export const canSee = (r: StoredRace, viewer: Viewer | null) =>
-  !r.owner || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
+  !r.owner || r.publishedAt !== undefined || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
 
 const recordKey = (id: string) => `races/${id}/race.json`;
 
@@ -193,8 +198,9 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
         km: r.officialKm,
         coverUrl: r.coverUrl,
         builtIn: false,
-        private: Boolean(r.owner),
+        private: Boolean(r.owner) && r.publishedAt === undefined,
         owner: r.owner,
+        publishedBy: r.publishedBy,
       }),
     );
   return [...builtIn, ...stored].sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
@@ -219,7 +225,14 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     location: r.location,
     officialUrl: r.officialUrl,
     files: filesOf(r),
+    publishedBy: r.publishedBy,
   };
+}
+
+/** The public race (built in, added by the admin or published by a runner) that this one would duplicate, if any. */
+export async function publishedTwin(r: StoredRace): Promise<RaceCard | null> {
+  const me = { event: r.event, date: r.date, km: r.officialKm };
+  return (await overviewRaces(null)).find((c) => c.id !== r.id && sameRace(c, me)) ?? null;
 }
 
 /** One event on the overview, such as a city marathon, with each distance it offers. */
@@ -235,6 +248,7 @@ export interface RaceEvent {
   /** Every distance, shortest first. */
   races: RaceCard[];
   private: boolean;
+  publishedBy?: string;
 }
 
 /**
@@ -244,7 +258,7 @@ export interface RaceEvent {
 export function groupByEvent(races: RaceCard[]): RaceEvent[] {
   const groups = new Map<string, RaceCard[]>();
   for (const r of races) {
-    const key = `${r.owner?.toLowerCase() ?? ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
+    const key = `${r.private ? r.owner!.toLowerCase() : ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return [...groups.entries()]
@@ -262,6 +276,7 @@ export function groupByEvent(races: RaceCard[]): RaceEvent[] {
         main,
         races: sorted,
         private: main.private,
+        publishedBy: main.publishedBy,
       };
     })
     .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));

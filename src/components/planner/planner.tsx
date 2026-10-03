@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
@@ -51,7 +51,8 @@ function goalError(seconds: number, km: number): string | null {
 }
 
 /** A race from the overview: the course plus its event details. */
-export type PlannerRace = CourseInput & Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files">;
+export type PlannerRace = CourseInput &
+  Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files"> & { publishedBy?: string };
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
 export function Planner({
@@ -60,6 +61,8 @@ export function Planner({
   distances = [],
   signedIn = false,
   savedGoal = null,
+  notice,
+  children,
 }: {
   race: PlannerRace | null;
   officialPreview?: LinkPreview | null;
@@ -68,6 +71,10 @@ export function Planner({
   signedIn?: boolean;
   /** The signed-in runner's saved goal for this race; the plan opens on it. */
   savedGoal?: SavedGoal | null;
+  /** Shown above the title, such as why the runner landed here. */
+  notice?: ReactNode;
+  /** Shown after the plan, such as the comments. */
+  children?: ReactNode;
 }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   // `draft` follows the controls; `goalSeconds` is the last in-range goal, which the plan uses.
@@ -167,13 +174,14 @@ export function Planner({
 
       <section className={styles.section} aria-labelledby="race-heading">
         <Breadcrumb items={[{ label: "Races", href: "/" }, { label: race ? race.name : "Your race" }]} />
+        {notice}
         <div className={styles.titleBlock}>
           <h1 id="race-heading" className={styles.title}>
             {race ? race.event : "Plan your own race"}
           </h1>
           <p className={styles.lede}>
             {race
-              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.`
+              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.${race.publishedBy ? ` Published by ${race.publishedBy}.` : ""}`
               : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
         </div>
@@ -285,6 +293,8 @@ export function Planner({
           </Tabs>
         </>
       ) : null}
+
+      {children}
 
       <footer className={styles.footer}>
         <p>

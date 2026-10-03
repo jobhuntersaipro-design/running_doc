@@ -42,9 +42,10 @@ describe("runners", () => {
     await recordSignIn("alex@gmail.com", "Alex Tan");
     expect(await listRunners()).toEqual([{ email: "alex@gmail.com", name: "Alex Tan", signedUpAt: "2026-10-02T08:05:00.000Z" }]);
     expect(db.queries.at(-1)?.text).toContain("order by signed_up_at desc");
-    expect(db.queries.filter((q) => q.text.startsWith("create table")).length).toBe(1);
-    expect(db.queries[3]).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
-    expect(db.queries[3].text).toContain("on conflict (email) do update");
+    expect(db.queries.filter((q) => q.text.startsWith("create table if not exists runners")).length).toBe(1);
+    const insert = db.queries.find((q) => q.text.startsWith("insert"));
+    expect(insert).toMatchObject({ values: ["alex@gmail.com", "Alex Tan"] });
+    expect(insert?.text).toContain("on conflict (email) do update");
   });
 
   it("retries creating the table after a failure", async () => {
@@ -52,7 +53,7 @@ describe("runners", () => {
     db.failNext = 1;
     await expect(recordSignIn("a@gmail.com", "A")).rejects.toThrow("network");
     await recordSignIn("a@gmail.com", "A");
-    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "alter", "insert"]);
+    expect(db.queries.map((q) => q.text.split(" ")[0])).toEqual(["create", "alter", "alter", "create", "create", "create", "insert"]);
   });
 
   it("saves a profile as JSON and only returns a valid one", async () => {

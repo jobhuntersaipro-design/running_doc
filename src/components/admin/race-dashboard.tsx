@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ImagePlus, Pencil, Plus } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { DeleteRace } from "./delete-race";
+import { PublishRace } from "./publish-race";
 import styles from "./admin.module.css";
 
 interface Row {
@@ -13,6 +14,7 @@ interface Row {
   coverUrl?: string;
   builtIn: boolean;
   owner?: string;
+  publishedBy?: string;
 }
 
 /** The race list in /admin (every race) and /my (a runner's own races). */
@@ -86,6 +88,7 @@ export function RaceDashboard({
                 {r.category}, {r.dateLabel}
                 {r.builtIn ? ", built in" : ""}
                 {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
+                {r.publishedBy ? `, published by ${r.publishedBy}` : r.owner ? ", private" : ""}
               </span>
             </div>
             <div className={styles.rowActions}>
@@ -93,6 +96,7 @@ export function RaceDashboard({
                 {r.builtIn ? <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" /> : <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />}
                 {r.builtIn ? "Cover" : "Edit"}
               </Link>
+              {r.owner && !r.publishedBy ? <PublishRace id={r.id} name={r.event} /> : null}
               {r.builtIn ? null : <DeleteRace id={r.id} name={r.event} />}
             </div>
           </li>

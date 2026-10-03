@@ -52,7 +52,7 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                 <div className={styles.cardBody}>
                   <p className={styles.date}>
                     {e.dateLabel}
-                    {e.private ? ", only you can see this" : ""}
+                    {e.private ? ", only you can see this" : e.publishedBy ? `, published by ${e.publishedBy}` : ""}
                   </p>
                   <h2 className={styles.cardTitle}>{e.event}</h2>
                   <p className={styles.meta}>

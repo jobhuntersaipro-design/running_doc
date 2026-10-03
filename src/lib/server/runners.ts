@@ -6,11 +6,11 @@ import { isRunnerProfile, isSavedGoal, type RunnerProfile, type SavedGoal } from
 const url = process.env.DATABASE_URL?.trim();
 const sql = url ? neon(url) : null;
 
-// ponytail: the one table is created and extended on first use; add a migration tool once there is a second table.
+// ponytail: tables are created and extended on first use; add a migration tool once a change needs more than "if not exists".
 let ready: Promise<unknown> | null = null;
 
-/** The database, with the runners table in place. A failed setup is retried on the next call. */
-function db() {
+/** The database, with its tables in place. A failed setup is retried on the next call. */
+export function db() {
   if (!sql) return null;
   ready ??= sql`create table if not exists runners (
     email text primary key,
@@ -20,6 +20,21 @@ function db() {
   )`
     .then(() => sql`alter table runners add column if not exists profile jsonb`)
     .then(() => sql`alter table runners add column if not exists goals jsonb not null default '{}'::jsonb`)
+    .then(() => sql`create table if not exists comments (
+      id bigserial primary key,
+      race_id text not null,
+      email text not null,
+      name text not null,
+      body text not null,
+      created_at timestamptz not null default now()
+    )`)
+    .then(() => sql`create index if not exists comments_race on comments (race_id, created_at)`)
+    .then(() => sql`create table if not exists comment_reactions (
+      comment_id bigint not null references comments (id) on delete cascade,
+      email text not null,
+      emoji text not null,
+      primary key (comment_id, email, emoji)
+    )`)
     .catch((e) => {
       ready = null;
       throw e;

@@ -11,6 +11,7 @@ import {
   getCoverOverride,
   getStoredRace,
   listRaces,
+  publishedTwin,
   saveRecord,
   type StoredRace,
 } from "@/lib/server/races";
@@ -252,6 +253,8 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       coverUrl,
       facts,
       owner: existing ? existing.owner : user.admin ? undefined : user.email,
+      publishedBy: existing?.publishedBy,
+      publishedAt: existing?.publishedAt,
       updatedAt: Date.now(),
     };
     await saveRecord(record);
@@ -289,6 +292,29 @@ export async function saveCover(_prev: FormState, fd: FormData): Promise<FormSta
     return storageError(e);
   }
   redirect("/admin?saved=1");
+}
+
+/**
+ * Makes a runner's race public, credited to them. A race that is already public
+ * (same event, day and distance) is not published twice: the runner is sent to it instead.
+ */
+export async function publishRace(id: string): Promise<FormState> {
+  const user = await requireUser();
+  let twin;
+  try {
+    const race = await getStoredRace(id);
+    if (!race || !owns(user, race)) return { error: "This race no longer exists." };
+    if (!race.owner || race.publishedAt !== undefined) return { error: "This race is already public." };
+    twin = await publishedTwin(race);
+    if (!twin) await saveRecord({ ...race, publishedBy: user.name, publishedAt: Date.now(), updatedAt: Date.now() });
+  } catch (e) {
+    return storageError(e);
+  }
+  if (twin) redirect(`/races/${twin.id}?duplicate=1`);
+  revalidatePath("/");
+  revalidatePath(`/races/${id}`);
+  revalidatePath(homeOf(user));
+  redirect(`/races/${id}?published=1`);
 }
 
 /** Deletes a race added in /admin, with its files. Built-in races live in the code and cannot be deleted here. */
