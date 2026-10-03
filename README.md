@@ -5,6 +5,8 @@ A planner for beginner marathon and half marathon runners. Give it a course GPX 
 - **Hills**: climbs, descents and flat sections from smoothed elevation.
 - **Pace**: per kilometre targets that slow on climbs, ease the first few km and finish a little quicker, all adding up to the goal.
 - **Fuel and water**: when to take each gel (lined up just before a drink station, never on a climb) and what to do at every station.
+- **Heat and humidity**: the forecast for race hours at the start line (Open-Meteo, no API key; last year's weather on the same day until the forecast opens about 16 days out). Temperature plus dew point sets how much slower to aim, and one tap makes that the goal.
+- **Plan vs actual**: after the race, drop in the GPX your watch recorded to see each km, each uphill and both halves against the plan. The file never leaves the device.
 - **Watch setup**: a Garmin workout file (`.fit`, one step per km with a pace range), plus pace blocks and phone sync steps for Garmin Connect, the Coros app and the iPhone Fitness app (Apple Watch).
 - **Race rehearsal**: replay the whole race in 30 s, 1 min or 3 min on an animated map, with elevation, pace zone and heart rate zone charts stacked below. Playback pauses at each uphill, downhill, gel and station with an animated marker, what to do, what you will feel and a short mental cue.
 - **The race in parts**: settle in, the hills, cruise, dig deep and finish, each with what to expect and what to focus on.

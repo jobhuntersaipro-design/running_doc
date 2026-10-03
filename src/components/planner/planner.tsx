@@ -20,7 +20,9 @@ import { CourseSetup } from "./course-setup";
 import { RaceResources } from "./race-resources";
 import { FinishBenchmarks } from "./finish-benchmarks";
 import { FuelPlan } from "./fuel-plan";
+import { HeatPanel } from "./heat-panel";
 import { HillsTable } from "./hills-table";
+import { RaceReview } from "./race-review";
 import { RaceRehearsal } from "./race-rehearsal";
 import { useRunnerProfile } from "./runner-profile";
 import { SplitsTable } from "./splits-table";
@@ -52,7 +54,7 @@ function goalError(seconds: number, km: number): string | null {
 
 /** A race from the overview: the course plus its event details. */
 export type PlannerRace = CourseInput &
-  Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files"> & { publishedBy?: string; bib?: string };
+  Pick<RaceMeta, "event" | "category" | "dateLabel" | "date" | "location" | "officialUrl" | "files"> & { publishedBy?: string; bib?: string };
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
 export function Planner({
@@ -226,6 +228,15 @@ export function Planner({
               <span className={styles.num}>{clockAt(startTime, summary.goalSeconds)}</span>.
               {cutoff && cutoffArrival ? ` You reach the km ${cutoff.km} cutoff around ${cutoffArrival}; it closes at ${cutoff.clock}.` : ""}
             </p>
+            <HeatPanel
+              lat={plan.track[0].lat}
+              lon={plan.track[0].lon}
+              date={race?.date}
+              startTime={startTime}
+              goalSeconds={goalSeconds}
+              km={km}
+              onUseGoal={changeGoal}
+            />
             {race ? (
               <div className={styles.goalSave}>
                 {signedIn ? (
@@ -291,6 +302,8 @@ export function Planner({
               <WatchSetup plan={plan} goal={goalFields} />
             </TabsContent>
           </Tabs>
+
+          <RaceReview plan={plan} />
         </>
       ) : null}
 

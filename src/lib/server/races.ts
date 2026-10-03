@@ -230,6 +230,7 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     event: r.event,
     category: r.category,
     dateLabel: r.dateLabel,
+    date: r.date,
     location: r.location,
     officialUrl: r.officialUrl,
     files: filesOf(r),
