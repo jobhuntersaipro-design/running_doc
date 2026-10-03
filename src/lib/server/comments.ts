@@ -32,21 +32,27 @@ export async function addComment(raceId: string, email: string, name: string, bo
   return true;
 }
 
-/** Adds the runner's reaction to a comment on this race, or takes it back if they already left it. */
-export async function toggleReaction(raceId: string, commentId: string, email: string, emoji: Reaction): Promise<void> {
+/** Adds the runner's reaction to a comment on this race, or takes it back if they already left it. Resolves true when added. */
+export async function toggleReaction(raceId: string, commentId: string, email: string, emoji: Reaction): Promise<boolean> {
   const q = await db();
-  if (!q) return;
-  await q`with gone as (
+  if (!q) return false;
+  const [row] = await q`with gone as (
       delete from comment_reactions where comment_id = ${commentId}::bigint and email = ${key(email)} and emoji = ${emoji} returning 1
+    ), added as (
+      insert into comment_reactions (comment_id, email, emoji)
+      select id, ${key(email)}, ${emoji} from comments
+      where id = ${commentId}::bigint and race_id = ${raceId} and not exists (select 1 from gone)
+      returning 1
     )
-    insert into comment_reactions (comment_id, email, emoji)
-    select id, ${key(email)}, ${emoji} from comments
-    where id = ${commentId}::bigint and race_id = ${raceId} and not exists (select 1 from gone)`;
+    select count(*)::int as n from added`;
+  return row?.n > 0;
 }
 
-/** Deletes a comment on this race, if the runner wrote it or is the admin. Its reactions go with it. */
-export async function deleteComment(raceId: string, commentId: string, viewer: { email: string; admin: boolean }): Promise<void> {
+/** Deletes a comment on this race, if the runner wrote it or is the admin. Its reactions go with it. Resolves to what was deleted. */
+export async function deleteComment(raceId: string, commentId: string, viewer: { email: string; admin: boolean }): Promise<{ email: string; body: string } | null> {
   const q = await db();
-  if (!q) return;
-  await q`delete from comments where id = ${commentId}::bigint and race_id = ${raceId} and (${viewer.admin} or email = ${key(viewer.email)})`;
+  if (!q) return null;
+  const gone = await q`delete from comments where id = ${commentId}::bigint and race_id = ${raceId} and (${viewer.admin} or email = ${key(viewer.email)})
+    returning email, body`;
+  return gone[0] ? { email: gone[0].email, body: gone[0].body } : null;
 }

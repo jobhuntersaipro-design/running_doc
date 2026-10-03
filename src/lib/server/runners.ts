@@ -35,6 +35,15 @@ export function db() {
       emoji text not null,
       primary key (comment_id, email, emoji)
     )`)
+    .then(() => sql`create table if not exists events (
+      id bigserial primary key,
+      at timestamptz not null default now(),
+      email text not null,
+      kind text not null,
+      race_id text,
+      detail text not null default ''
+    )`)
+    .then(() => sql`create index if not exists events_at on events (at desc)`)
     .catch((e) => {
       ready = null;
       throw e;

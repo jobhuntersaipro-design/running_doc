@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getRace } from "@/lib/courses";
 import { parseGpx, type Station } from "@/lib/planner";
+import { logEvent } from "@/lib/server/activity";
 import { endSession, getUser, isAdmin, startSession, verifyCredentials, type SessionUser } from "@/lib/server/auth";
 import {
   cardFacts,
@@ -258,6 +259,7 @@ export async function saveRace(_prev: FormState, fd: FormData): Promise<FormStat
       updatedAt: Date.now(),
     };
     await saveRecord(record);
+    await logEvent(user.email, existing ? "race_edited" : "race_added", id, `${event}, ${category}`);
     await deleteFiles(replaced);
     revalidatePath("/");
     revalidatePath(`/races/${id}`);
@@ -285,6 +287,7 @@ export async function saveCover(_prev: FormState, fd: FormData): Promise<FormSta
       coverUrl = await saveFile(`races/${id}/cover.${cover.ext}`, cover.body, cover.type, { randomSuffix: true });
     }
     await saveRecord({ kind: "cover", id, coverUrl, updatedAt: Date.now() });
+    await logEvent((await getUser())?.email ?? "admin", "cover", id, coverUrl ? "set" : "removed");
     if (existing?.coverUrl) await deleteFiles([existing.coverUrl]);
     revalidatePath("/");
     revalidatePath("/admin");
@@ -306,7 +309,10 @@ export async function publishRace(id: string): Promise<FormState> {
     if (!race || !owns(user, race)) return { error: "This race no longer exists." };
     if (!race.owner || race.publishedAt !== undefined) return { error: "This race is already public." };
     twin = await publishedTwin(race);
-    if (!twin) await saveRecord({ ...race, publishedBy: user.name, publishedAt: Date.now(), updatedAt: Date.now() });
+    if (!twin) {
+      await saveRecord({ ...race, publishedBy: user.name, publishedAt: Date.now(), updatedAt: Date.now() });
+      await logEvent(user.email, "race_published", id, `${race.event}, ${race.category}`);
+    }
   } catch (e) {
     return storageError(e);
   }
@@ -324,6 +330,7 @@ export async function unpublishRace(id: string): Promise<FormState> {
     const race = await getStoredRace(id);
     if (!race || !owns(user, race) || race.publishedAt === undefined) return { error: "This race is not published." };
     await saveRecord({ ...race, publishedBy: undefined, publishedAt: undefined, updatedAt: Date.now() });
+    await logEvent(user.email, "race_unpublished", id, `${race.event}, ${race.category}`);
   } catch (e) {
     return storageError(e);
   }
@@ -341,6 +348,7 @@ export async function deleteRace(id: string): Promise<FormState> {
     const race = await getStoredRace(id);
     if (!race || !owns(user, race)) return { error: "This race no longer exists." };
     await deleteRaceFiles(id);
+    await logEvent(user.email, "race_deleted", id, `${race.event}, ${race.category}${race.owner && !owns({ ...user, admin: false }, race) ? ` (added by ${race.owner})` : ""}`);
   } catch (e) {
     return storageError(e);
   }

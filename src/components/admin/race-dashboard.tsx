@@ -26,6 +26,7 @@ export function RaceDashboard({
   saved,
   storage,
   empty,
+  stats,
   children,
 }: {
   title: string;
@@ -36,6 +37,8 @@ export function RaceDashboard({
   saved: boolean;
   storage: { ok: true } | { ok: false; error: string };
   empty?: string;
+  /** Admin only: engagement per race id. Adds it to each row with a link to the race's details. */
+  stats?: Record<string, string>;
   /** Shown under the heading, above the race list. */
   children?: ReactNode;
 }) {
@@ -89,9 +92,15 @@ export function RaceDashboard({
                 {r.builtIn ? ", built in" : ""}
                 {r.owner && base === "/admin" ? `, added by ${r.owner}` : ""}
                 {r.publishedBy ? `, published by ${r.publishedBy}` : r.owner ? ", private" : ""}
+                {stats?.[r.id] ? `. ${stats[r.id]}` : ""}
               </span>
             </div>
             <div className={styles.rowActions}>
+              {stats ? (
+                <Link href={`/admin?tab=races&race=${encodeURIComponent(r.id)}`} className={styles.ghostLink}>
+                  Details
+                </Link>
+              ) : null}
               <Link href={`${base}/races/${r.id}`} className={styles.ghostLink}>
                 {r.builtIn ? <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" /> : <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />}
                 {r.builtIn ? "Cover" : "Edit"}

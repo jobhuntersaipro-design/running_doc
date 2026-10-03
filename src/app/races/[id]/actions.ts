@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getRace } from "@/lib/courses";
-import { isSavedGoal, type SavedGoal } from "@/lib/planner";
+import { formatClock, isSavedGoal, type SavedGoal } from "@/lib/planner";
 import { MAX_COMMENT, REACTIONS, type Reaction } from "@/lib/comments";
 import { getUser, type SessionUser } from "@/lib/server/auth";
+import { logEvent } from "@/lib/server/activity";
 import { addComment, deleteComment, toggleReaction } from "@/lib/server/comments";
 import { canSee, getStoredRace } from "@/lib/server/races";
 import { saveGoal as storeGoal } from "@/lib/server/runners";
@@ -28,6 +29,7 @@ export async function saveGoal(raceId: string, goalSeconds: number, startTime: s
   });
   if (ok === null) return { error: "Your goal could not be saved. Try again in a moment." };
   if (!ok) return { error: "Saving goals is not set up yet." };
+  await logEvent(user.email, "goal", raceId, `${formatClock(goalSeconds)}, start ${startTime}`);
   revalidatePath("/my");
   return { saved: goal };
 }
@@ -48,6 +50,7 @@ export async function postComment(raceId: string, _prev: CommentState, fd: FormD
   });
   if (ok === null) return { error: "Your comment could not be posted. Try again in a moment." };
   if (!ok) return { error: "Comments are not set up yet." };
+  await logEvent(user.email, "comment", raceId, body);
   revalidatePath(`/races/${raceId}`);
   return { posted: Date.now() };
 }
@@ -56,7 +59,8 @@ export async function postComment(raceId: string, _prev: CommentState, fd: FormD
 export async function reactToComment(raceId: string, commentId: string, emoji: Reaction): Promise<void> {
   const user = await getUser();
   if (!user || !/^\d+$/.test(commentId) || !REACTIONS.includes(emoji) || !(await canSeeRace(raceId, user))) return;
-  await toggleReaction(raceId, commentId, user.email, emoji);
+  const added = await toggleReaction(raceId, commentId, user.email, emoji);
+  await logEvent(user.email, added ? "reaction" : "unreaction", raceId, `${emoji} on comment ${commentId}`);
   revalidatePath(`/races/${raceId}`);
 }
 
@@ -64,6 +68,8 @@ export async function reactToComment(raceId: string, commentId: string, emoji: R
 export async function removeComment(raceId: string, commentId: string): Promise<void> {
   const user = await getUser();
   if (!user || !/^\d+$/.test(commentId)) return;
-  await deleteComment(raceId, commentId, user);
+  const gone = await deleteComment(raceId, commentId, user);
+  if (gone) await logEvent(user.email, "comment_deleted", raceId, gone.email === user.email.toLowerCase() ? gone.body : `by ${gone.email}: ${gone.body}`);
   revalidatePath(`/races/${raceId}`);
+  if (user.admin) revalidatePath("/admin");
 }
