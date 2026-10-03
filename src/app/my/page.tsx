@@ -34,7 +34,7 @@ export default async function MyRacesPage(props: PageProps<"/my">) {
     <AdminShell signedIn home="/my">
       <RaceDashboard
         title="My races"
-        lede={`Signed in as ${user.email}. Races you add are only visible to you until you publish them.`}
+        lede={`Signed in as ${user.email}. Races you add are private until you switch them to public.`}
         base="/my"
         races={races}
         saved={Boolean(raceSaved)}

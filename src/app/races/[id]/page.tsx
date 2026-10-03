@@ -49,21 +49,14 @@ async function commentsFor(id: string, viewer: Viewer | null) {
   });
 }
 
-/** Why the runner landed here after publishing. */
+/** Shown when a runner tried to publish a race that is already public: they are sent here instead. */
 function noticeFor(query: Record<string, string | string[] | undefined>) {
-  if (query.duplicate)
-    return (
-      <Alert tone="warning" title="This race is already published">
-        Your race was not published, so there is one page for everyone. Plan and comment here instead.
-      </Alert>
-    );
-  if (query.published)
-    return (
-      <Alert tone="success" title="Published">
-        Everyone can see this race now, with your name on it.
-      </Alert>
-    );
-  return null;
+  if (!query.duplicate) return null;
+  return (
+    <Alert tone="warning" title="This race is already published">
+      Your race stays private, so there is one page for everyone. Plan and comment here instead.
+    </Alert>
+  );
 }
 
 export default async function RacePage(props: PageProps<"/races/[id]">) {

@@ -358,3 +358,17 @@
     flex: 1;
   }
 }
+
+.publish {
+  display: inline-grid;
+  justify-items: end;
+  gap: var(--space-1);
+  margin-inline-end: var(--space-2);
+}
+
+.publishError {
+  max-width: 24ch;
+  color: var(--danger);
+  font-size: var(--text-xs);
+  text-align: end;
+}

@@ -1,20 +1,41 @@
 "use client";
 
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
-import { publishRace } from "@/app/admin/actions";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { Switch } from "@/components/arc/switch/switch";
+import { publishRace, unpublishRace } from "@/app/admin/actions";
+import styles from "./admin.module.css";
 
-/** Publishes a runner's race. The action redirects to the race, or to the public race it would duplicate. */
-export function PublishRace({ id, name }: { id: string; name: string }) {
+/**
+ * Switches a runner's race between public and private. Publishing a race that is
+ * already public elsewhere redirects to that race instead.
+ */
+export function PublishRace({ id, published }: { id: string; published: boolean }) {
+  const router = useRouter();
+  const [on, setOn] = useState(published);
+  const [error, setError] = useState<string>();
+  const [pending, startTransition] = useTransition();
+
+  function toggle(next: boolean) {
+    setOn(next);
+    setError(undefined);
+    startTransition(async () => {
+      const res = await (next ? publishRace(id) : unpublishRace(id));
+      if (res.error) {
+        setOn(!next);
+        setError(res.error);
+      } else router.refresh();
+    });
+  }
+
   return (
-    <ConfirmMorph
-      label="Publish"
-      tone="neutral"
-      prompt={`Publish ${name} for everyone?`}
-      confirmLabel="Publish"
-      onConfirm={async () => {
-        const res = await publishRace(id);
-        if (res.error) throw new Error(res.error);
-      }}
-    />
+    <span className={styles.publish}>
+      <Switch label={on ? "Public" : "Private"} checked={on} onCheckedChange={toggle} disabled={pending} />
+      {error ? (
+        <span role="alert" className={styles.publishError}>
+          {error}
+        </span>
+      ) : null}
+    </span>
   );
 }

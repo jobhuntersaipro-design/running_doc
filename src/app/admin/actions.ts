@@ -314,7 +314,23 @@ export async function publishRace(id: string): Promise<FormState> {
   revalidatePath("/");
   revalidatePath(`/races/${id}`);
   revalidatePath(homeOf(user));
-  redirect(`/races/${id}?published=1`);
+  return {};
+}
+
+/** Makes a published race private to its runner again. */
+export async function unpublishRace(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    const race = await getStoredRace(id);
+    if (!race || !owns(user, race) || race.publishedAt === undefined) return { error: "This race is not published." };
+    await saveRecord({ ...race, publishedBy: undefined, publishedAt: undefined, updatedAt: Date.now() });
+  } catch (e) {
+    return storageError(e);
+  }
+  revalidatePath("/");
+  revalidatePath(`/races/${id}`);
+  revalidatePath(homeOf(user));
+  return {};
 }
 
 /** Deletes a race added in /admin, with its files. Built-in races live in the code and cannot be deleted here. */

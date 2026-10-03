@@ -96,7 +96,7 @@ export function RaceDashboard({
                 {r.builtIn ? <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" /> : <Pencil size={16} strokeWidth={1.75} aria-hidden="true" />}
                 {r.builtIn ? "Cover" : "Edit"}
               </Link>
-              {r.owner && !r.publishedBy ? <PublishRace id={r.id} name={r.event} /> : null}
+              {r.owner ? <PublishRace id={r.id} published={Boolean(r.publishedBy)} /> : null}
               {r.builtIn ? null : <DeleteRace id={r.id} name={r.event} />}
             </div>
           </li>
