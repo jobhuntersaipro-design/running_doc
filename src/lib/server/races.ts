@@ -2,6 +2,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { RACES, getRace } from "@/lib/courses";
+import { sameRace } from "@/lib/courses/distance";
 import type { RaceFile, RaceMeta } from "@/lib/courses/types";
 import { buildPlan, routePreview, type Station } from "@/lib/planner";
 import { deleteFiles, listFiles, readText, saveFile } from "./store";
@@ -22,7 +23,13 @@ export interface StoredRace {
   /** "YYYY-MM-DD" */
   date: string;
   dateLabel: string;
+  /** "City, Country", shown on the card and the plan. */
   location: string;
+  /** ISO country code and city, kept apart for the form. Older races have only `location`. */
+  country?: string;
+  city?: string;
+  /** The runner's own bib number, shown only to them. */
+  bib?: string;
   officialUrl: string;
   distance: "5k" | "10k" | "half" | "full" | "custom";
   officialKm: number;
@@ -33,8 +40,15 @@ export interface StoredRace {
   pdfUrl?: string;
   coverUrl?: string;
   facts: CardFacts;
-  /** Email of the runner who added it. Their races are private to them; admin races have no owner and are public. */
+  /** Email of the runner who added it. Their races are private to them until published; admin races have no owner and are public. */
   owner?: string;
+  /** The runner's name when they added it, shown as "created by". */
+  ownerName?: string;
+  /** Set when a runner publishes their race for everyone: the name shown as "published by". */
+  publishedBy?: string;
+  publishedAt?: number;
+  /** When runners were emailed about it. Set once, so publishing again does not email them again. */
+  announcedAt?: number;
   updatedAt: number;
 }
 
@@ -62,19 +76,27 @@ export interface RaceCard extends CardFacts {
   km: number;
   coverUrl?: string;
   builtIn: boolean;
-  /** Added by a runner, so only they (and the admin) can see it. */
+  /** Added by a runner and not published, so only they (and the admin) can see it. */
   private: boolean;
   owner?: string;
+  publishedBy?: string;
+  /** Who made it: the runner who added or published it, or Running Doc for built-in and admin races. */
+  createdBy: string;
 }
 
 /** Who is looking: private races show only to their owner, or to the admin. */
 export interface Viewer {
   email: string;
   admin: boolean;
+  name?: string;
 }
 
+export const RUNNING_DOC = "Running Doc";
+/** The app icon, the avatar for Running Doc. */
+export const RUNNING_DOC_AVATAR = "/apple-icon.png";
+
 export const canSee = (r: StoredRace, viewer: Viewer | null) =>
-  !r.owner || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
+  !r.owner || r.publishedAt !== undefined || (viewer !== null && (viewer.admin || viewer.email.toLowerCase() === r.owner.toLowerCase()));
 
 const recordKey = (id: string) => `races/${id}/race.json`;
 
@@ -173,6 +195,7 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
         coverUrl: override?.kind === "cover" ? override.coverUrl : undefined,
         builtIn: true,
         private: false,
+        createdBy: RUNNING_DOC,
       };
     }),
   );
@@ -193,8 +216,12 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
         km: r.officialKm,
         coverUrl: r.coverUrl,
         builtIn: false,
-        private: Boolean(r.owner),
+        private: Boolean(r.owner) && r.publishedAt === undefined,
         owner: r.owner,
+        publishedBy: r.publishedBy,
+        createdBy: !r.owner
+          ? RUNNING_DOC
+          : (r.publishedBy ?? (viewer?.name && viewer.email.toLowerCase() === r.owner.toLowerCase() ? viewer.name : (r.ownerName ?? r.owner.split("@")[0]))),
       }),
     );
   return [...builtIn, ...stored].sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));
@@ -204,6 +231,8 @@ export async function overviewRaces(viewer: Viewer | null): Promise<RaceCard[]> 
 export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
   const r = await getStoredRace(id);
   if (!r || !canSee(r, viewer)) return null;
+  // The bib belongs to whoever added the race: the runner, or the admin for admin races.
+  const mine = viewer !== null && (r.owner ? r.owner.toLowerCase() === viewer.email.toLowerCase() : viewer.admin);
   const gpx = await readText(r.gpxUrl);
   return {
     id: r.id,
@@ -216,10 +245,21 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
     event: r.event,
     category: r.category,
     dateLabel: r.dateLabel,
+    date: r.date,
     location: r.location,
     officialUrl: r.officialUrl,
     files: filesOf(r),
+    publishedBy: r.publishedBy,
+    bib: mine ? r.bib : undefined,
+    /** Its runner and the admin can delete it. */
+    deletable: viewer !== null && (viewer.admin || r.owner?.toLowerCase() === viewer.email.toLowerCase()),
   };
+}
+
+/** The public race (built in, added by the admin or published by a runner) that this one would duplicate, if any. */
+export async function publishedTwin(r: StoredRace): Promise<RaceCard | null> {
+  const me = { event: r.event, date: r.date, km: r.officialKm };
+  return (await overviewRaces(null)).find((c) => c.id !== r.id && sameRace(c, me)) ?? null;
 }
 
 /** One event on the overview, such as a city marathon, with each distance it offers. */
@@ -235,7 +275,13 @@ export interface RaceEvent {
   /** Every distance, shortest first. */
   races: RaceCard[];
   private: boolean;
+  publishedBy?: string;
+  createdBy: string;
 }
+
+/** Races with the same key are distances of one event: same name, and the same runner if private. */
+export const eventKey = (r: { event: string; private: boolean; owner?: string }) =>
+  `${r.private ? r.owner!.toLowerCase() : ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
 
 /**
  * Groups races by event name, so a 10K and a half marathon added under the same
@@ -244,7 +290,7 @@ export interface RaceEvent {
 export function groupByEvent(races: RaceCard[]): RaceEvent[] {
   const groups = new Map<string, RaceCard[]>();
   for (const r of races) {
-    const key = `${r.owner?.toLowerCase() ?? ""}|${r.event.trim().toLowerCase().replace(/\s+/g, " ")}`;
+    const key = eventKey(r);
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
   return [...groups.entries()]
@@ -262,6 +308,8 @@ export function groupByEvent(races: RaceCard[]): RaceEvent[] {
         main,
         races: sorted,
         private: main.private,
+        publishedBy: main.publishedBy,
+        createdBy: main.createdBy,
       };
     })
     .sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999"));

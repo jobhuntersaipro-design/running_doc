@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
@@ -20,7 +20,9 @@ import { CourseSetup } from "./course-setup";
 import { RaceResources } from "./race-resources";
 import { FinishBenchmarks } from "./finish-benchmarks";
 import { FuelPlan } from "./fuel-plan";
+import { HeatPanel } from "./heat-panel";
 import { HillsTable } from "./hills-table";
+import { RaceReview } from "./race-review";
 import { RaceRehearsal } from "./race-rehearsal";
 import { useRunnerProfile } from "./runner-profile";
 import { SplitsTable } from "./splits-table";
@@ -51,7 +53,8 @@ function goalError(seconds: number, km: number): string | null {
 }
 
 /** A race from the overview: the course plus its event details. */
-export type PlannerRace = CourseInput & Pick<RaceMeta, "event" | "category" | "dateLabel" | "location" | "officialUrl" | "files">;
+export type PlannerRace = CourseInput &
+  Pick<RaceMeta, "event" | "category" | "dateLabel" | "date" | "location" | "officialUrl" | "files"> & { publishedBy?: string; bib?: string };
 
 /** The plan for one race, or for an uploaded GPX when `race` is null. */
 export function Planner({
@@ -60,6 +63,9 @@ export function Planner({
   distances = [],
   signedIn = false,
   savedGoal = null,
+  notice,
+  actions,
+  children,
 }: {
   race: PlannerRace | null;
   officialPreview?: LinkPreview | null;
@@ -68,6 +74,12 @@ export function Planner({
   signedIn?: boolean;
   /** The signed-in runner's saved goal for this race; the plan opens on it. */
   savedGoal?: SavedGoal | null;
+  /** Shown above the title, such as why the runner landed here. */
+  notice?: ReactNode;
+  /** Buttons under the title: the like, and delete for the race's runner or the admin. */
+  actions?: ReactNode;
+  /** Shown after the plan, such as the comments. */
+  children?: ReactNode;
 }) {
   const [uploaded, setUploaded] = useState<CourseInput | null>(null);
   // `draft` follows the controls; `goalSeconds` is the last in-range goal, which the plan uses.
@@ -167,15 +179,17 @@ export function Planner({
 
       <section className={styles.section} aria-labelledby="race-heading">
         <Breadcrumb items={[{ label: "Races", href: "/" }, { label: race ? race.name : "Your race" }]} />
+        {notice}
         <div className={styles.titleBlock}>
           <h1 id="race-heading" className={styles.title}>
             {race ? race.event : "Plan your own race"}
           </h1>
           <p className={styles.lede}>
             {race
-              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.`
+              ? `${race.category}, ${race.officialKm.toFixed(1)} km. ${race.dateLabel}, ${race.location}.${race.publishedBy ? ` Published by ${race.publishedBy}.` : ""}${race.bib ? ` Your bib: ${race.bib}.` : ""}`
               : "Upload the course GPX, choose the distance and add the aid stations from your race guide."}
           </p>
+          {actions ? <div className={styles.titleActions}>{actions}</div> : null}
         </div>
         {distances.length > 1 ? (
           <nav className={styles.distanceTabs} aria-label="Race distance">
@@ -218,6 +232,15 @@ export function Planner({
               <span className={styles.num}>{clockAt(startTime, summary.goalSeconds)}</span>.
               {cutoff && cutoffArrival ? ` You reach the km ${cutoff.km} cutoff around ${cutoffArrival}; it closes at ${cutoff.clock}.` : ""}
             </p>
+            <HeatPanel
+              lat={plan.track[0].lat}
+              lon={plan.track[0].lon}
+              date={race?.date}
+              startTime={startTime}
+              goalSeconds={goalSeconds}
+              km={km}
+              onUseGoal={changeGoal}
+            />
             {race ? (
               <div className={styles.goalSave}>
                 {signedIn ? (
@@ -283,8 +306,12 @@ export function Planner({
               <WatchSetup plan={plan} goal={goalFields} />
             </TabsContent>
           </Tabs>
+
+          <RaceReview plan={plan} />
         </>
       ) : null}
+
+      {children}
 
       <footer className={styles.footer}>
         <p>

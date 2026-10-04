@@ -2,7 +2,7 @@ import type { ProfileSample, TrackPoint } from "./types";
 
 const EARTH_RADIUS_M = 6371000;
 
-export function haversineM(a: TrackPoint, b: TrackPoint): number {
+export function haversineM(a: Pick<TrackPoint, "lat" | "lon">, b: Pick<TrackPoint, "lat" | "lon">): number {
   const la = (a.lat * Math.PI) / 180;
   const lb = (b.lat * Math.PI) / 180;
   const dLon = ((b.lon - a.lon) * Math.PI) / 180;
