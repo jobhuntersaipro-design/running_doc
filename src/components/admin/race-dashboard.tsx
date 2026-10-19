@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ImagePlus, Pencil, Plus } from "lucide-react";
 import { Alert } from "@/components/arc/alert/alert";
 import { ExpandableCard } from "@/components/arc/expandable-card/expandable-card";
+import { Badge } from "@/components/arc/badge/badge";
 import { VisibilityBadge, visibilityOf } from "@/components/site/visibility-badge";
 import { DeleteRace } from "./delete-race";
 import { eventKey } from "@/lib/server/races";
@@ -23,6 +24,8 @@ interface Row {
   owner?: string;
   publishedBy?: string;
   bib?: string;
+  /** Missing on upcoming races, which have no GPX yet. */
+  preview?: object;
 }
 
 export interface RaceStats {
@@ -143,6 +146,11 @@ export function RaceDashboard({
                                 {r.category}
                               </Link>
                               <VisibilityBadge visibility={visibilityOf(r)} />
+                              {r.preview ? null : (
+                                <Badge tone="info" size="sm">
+                                  Upcoming
+                                </Badge>
+                              )}
                             </span>
                             <span className={styles.raceMeta}>
                               {r.dateLabel}

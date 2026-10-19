@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
 import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
 import { RoutePreview } from "@/components/site/route-preview";
 import { LikeButton } from "@/components/site/like-button";
 import { SiteHeader } from "@/components/site/site-header";
@@ -58,16 +59,27 @@ export function Overview({
                     {/* Covers come from R2 or /api/files, so a plain img avoids image optimizer host config. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={r.coverUrl} alt="" className={styles.cover} loading="lazy" decoding="async" />
-                    <span className={styles.routeInset} aria-hidden="true">
-                      <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
-                    </span>
+                    {r.preview ? (
+                      <span className={styles.routeInset} aria-hidden="true">
+                        <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
+                      </span>
+                    ) : null}
                   </div>
-                ) : (
+                ) : r.preview ? (
                   <div className={styles.preview}>
                     <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
                   </div>
+                ) : (
+                  <div className={`${styles.preview} ${styles.previewSvg}`} />
                 )}
                 <div className={styles.cardBody}>
+                  {r.preview ? null : (
+                    <p>
+                      <Badge tone="info" size="sm">
+                        GPX coming soon
+                      </Badge>
+                    </p>
+                  )}
                   {e.private || e.publishedBy || isAdmin ? (
                     <p className={styles.privacy}>
                       <VisibilityBadge visibility={e.private ? "private" : e.publishedBy ? "published" : "public"} />

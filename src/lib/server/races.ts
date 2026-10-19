@@ -18,6 +18,8 @@ export interface CardFacts {
 export interface StoredRace {
   kind: "stored";
   id: string;
+  /** "upcoming": listed before its course GPX is out, so it has no gpxUrl or facts yet. Missing reads as "ready". */
+  status?: "upcoming" | "ready";
   event: string;
   category: string;
   /** "YYYY-MM-DD" */
@@ -36,10 +38,10 @@ export interface StoredRace {
   startTime?: string;
   stations: Station[];
   stationsApproximate: boolean;
-  gpxUrl: string;
+  gpxUrl?: string;
   pdfUrl?: string;
   coverUrl?: string;
-  facts: CardFacts;
+  facts?: CardFacts;
   /** Email of the runner who added it. Their races are private to them until published; admin races have no owner and are public. */
   owner?: string;
   /** The runner's name when they added it, shown as "created by". */
@@ -63,7 +65,7 @@ export interface CoverOverride {
 type RaceRecord = StoredRace | CoverOverride;
 
 /** What the overview card shows. */
-export interface RaceCard extends CardFacts {
+export interface RaceCard extends Partial<CardFacts> {
   id: string;
   event: string;
   category: string;
@@ -164,7 +166,7 @@ export async function deleteRaceFiles(id: string): Promise<void> {
 }
 
 function filesOf(r: StoredRace): RaceFile[] {
-  const files: RaceFile[] = [{ label: "Course GPX", href: r.gpxUrl, kind: "gpx" }];
+  const files: RaceFile[] = r.gpxUrl ? [{ label: "Course GPX", href: r.gpxUrl, kind: "gpx" }] : [];
   if (r.pdfUrl) files.push({ label: "Official route map (PDF)", href: r.pdfUrl, kind: "pdf" });
   return files;
 }
@@ -233,7 +235,7 @@ export async function storedRaceForPlanner(id: string, viewer: Viewer | null) {
   if (!r || !canSee(r, viewer)) return null;
   // The bib belongs to whoever added the race: the runner, or the admin for admin races.
   const mine = viewer !== null && (r.owner ? r.owner.toLowerCase() === viewer.email.toLowerCase() : viewer.admin);
-  const gpx = await readText(r.gpxUrl);
+  const gpx = r.gpxUrl ? await readText(r.gpxUrl) : null;
   return {
     id: r.id,
     name: `${r.event}, ${r.category}`,
