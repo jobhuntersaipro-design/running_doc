@@ -14,6 +14,7 @@ export const EVENT_KINDS = {
   race_liked: "liked a race",
   race_unliked: "took back a like",
   announce: "emailed runners about a race",
+  digest: "emailed runners the upcoming races",
   emails_off: "unsubscribed from new race emails",
   emails_on: "turned new race emails back on",
   race_added: "added a race",

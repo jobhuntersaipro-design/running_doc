@@ -1,15 +1,14 @@
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { sameRace } from "@/lib/courses/distance";
 import { logEvent } from "@/lib/server/activity";
-import { announceRace } from "@/lib/server/announce";
 import { apiAuthError } from "@/lib/server/auth";
 import { API_ACTOR, apiFailure, parseRaceInput, slugify, uniqueId, writeRace } from "@/lib/server/race-input";
-import { overviewRaces, RUNNING_DOC, type RaceCard } from "@/lib/server/races";
+import { overviewRaces, type RaceCard } from "@/lib/server/races";
 
 /**
  * Races API for bots, with a bearer token (RACES_API_TOKEN). Races added here are
- * public admin races, the same record the /admin form saves.
+ * public admin races, the same record the /admin form saves. Adding races sends no
+ * email: POST /api/admin/races/digest emails runners once the batch is done.
  */
 
 const summary = (r: RaceCard) => ({
@@ -58,9 +57,6 @@ export async function POST(req: Request) {
     const saved = await writeRace(input, id, null, { announcedAt: Date.now() });
     if (!("race" in saved)) return Response.json(saved, { status: 400 });
     await logEvent(API_ACTOR, "race_added", id, `${input.event}, ${input.category}`);
-    // Like the admin's own new races: public at once, so runners hear about it.
-    const site = new URL(req.url).origin;
-    after(() => announceRace({ ...saved.race, publishedBy: RUNNING_DOC }, site, API_ACTOR, []).catch((e) => console.error("Announcing race failed:", e)));
     revalidatePath("/");
     revalidatePath(`/races/${id}`);
     revalidatePath("/admin");
