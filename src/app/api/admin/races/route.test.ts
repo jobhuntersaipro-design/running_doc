@@ -5,7 +5,13 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
-vi.mock("next/server", () => ({ after: () => {} }));
+const runners = vi.hoisted(() => [
+  { email: "alex@gmail.com", name: "Alex Tan" },
+  { email: "mei@gmail.com", name: "Mei Ling" },
+  { email: "sam@gmail.com", name: "Sam" },
+]);
+// Opted-out runners are left out by the recipients query itself.
+vi.mock("@/lib/server/runners", () => ({ db: async () => null, raceEmailRecipients: async () => runners }));
 
 const TOKEN = "t".repeat(40);
 const gpx = await readFile(path.join(process.cwd(), "public/races/klscm-2026-hm/course.gpx"), "utf8");
@@ -15,6 +21,8 @@ process.chdir(await mkdtemp(path.join(tmpdir(), "races-api-")));
 await symlink(path.join(repo, "public"), "public");
 const { GET, POST } = await import("./route");
 const { PATCH } = await import("./[id]/route");
+const { POST: DIGEST } = await import("./digest/route");
+const resend = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => new Response("{}"));
 
 const fields = {
   event: "Penang Bridge Run",
@@ -36,7 +44,12 @@ const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const gpxFile = () => new File([gpx], "course.gpx");
 
 describe("races API", () => {
-  beforeAll(() => vi.stubEnv("RACES_API_TOKEN", TOKEN));
+  beforeAll(() => {
+    vi.stubEnv("RACES_API_TOKEN", TOKEN);
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    vi.stubEnv("EMAIL_FROM", "Running Doc <hello@running-doc.space>");
+    vi.stubGlobal("fetch", resend);
+  });
 
   it("is off without a token, and refuses a missing or wrong one without echoing it", async () => {
     vi.stubEnv("RACES_API_TOKEN", "");
@@ -88,5 +101,45 @@ describe("races API", () => {
     expect((await bad.json()).fieldErrors).toEqual({ date: "Choose the race date.", pdf: "This file is not a PDF." });
     const big = await POST(req("POST", undefined, fields, { pdf: new File([new Uint8Array(4.4 * 1024 * 1024)], "x.pdf") }));
     expect(big.status).toBe(413);
+  });
+
+  it("sends no email when races are added, then one digest per runner of the three nearest upcoming events", async () => {
+    expect(resend).not.toHaveBeenCalled();
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-19T12:00:00Z") });
+    for (const [event, date] of [["Ipoh Heritage Run", "2027-03-07"], ["Melaka River Run", "2027-05-02"], ["Kuching Run", "2029-01-01"]])
+      await POST(req("POST", undefined, { ...fields, event, date }));
+    expect(resend).not.toHaveBeenCalled();
+
+    const digest = () => DIGEST(new Request("https://www.running-doc.space/api/admin/races/digest", { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } }));
+    const res = await digest();
+    expect(await res.json()).toEqual({
+      sent: 3,
+      runners: 3,
+      races: ["ipoh-heritage-run-half-marathon", "melaka-river-run-half-marathon", "penang-bridge-run-half-marathon"],
+    });
+    const [url, init] = resend.mock.calls[0];
+    expect(url).toBe("https://api.resend.com/emails/batch");
+    const emails = JSON.parse(init.body as string);
+    expect(emails.map((e: { to: string }) => e.to)).toEqual(runners.map((r) => r.email));
+    expect(emails[0].subject).toBe("3 upcoming races: Ipoh Heritage Run + 2 more");
+    expect(emails[0].text).toContain("Penang Bridge Run\nSunday 21 November 2027\nPenang, Malaysia\n10K · 21K\nRace plan: https://www.running-doc.space/races/penang-bridge-run-half-marathon");
+    // The built-in KL Marathon (3 October 2026) is past, and Kuching is fourth.
+    expect(emails[0].html).not.toContain("KL Marathon");
+    expect(emails[0].html).not.toContain("Kuching");
+    expect(emails[0].html.match(/Open race plan/g)).toHaveLength(3);
+
+    expect((await digest()).status).toBe(409);
+    expect(resend).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("refuses to send the digest without a verified sender", async () => {
+    const digest = () => DIGEST(new Request("http://x/api/admin/races/digest", { method: "POST", headers: { authorization: `Bearer ${TOKEN}` } }));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("EMAIL_FROM", "");
+    expect((await digest()).status).toBe(503);
+    vi.stubEnv("EMAIL_FROM", "Running Doc <onboarding@resend.dev>");
+    expect((await digest()).status).toBe(503);
+    expect((await DIGEST(new Request("http://x/api/admin/races/digest", { method: "POST" }))).status).toBe(401);
   });
 });
