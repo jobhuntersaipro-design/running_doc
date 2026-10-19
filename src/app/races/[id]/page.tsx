@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ExternalLink, FileDown } from "lucide-react";
+import styles from "@/components/overview/overview.module.css";
+import { SiteHeader } from "@/components/site/site-header";
 import { Alert } from "@/components/arc/alert/alert";
 import { Planner } from "@/components/planner/planner";
 import { RaceComments } from "@/components/planner/race-comments";
@@ -80,8 +83,9 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
   const builtIn = getRace(id);
   const stored = builtIn ? null : await storedRaceForPlanner(id, user).catch(() => null);
   if (!builtIn && !stored) notFound();
+  if (stored?.gpx === null) return <UpcomingRace race={stored} />;
   const [race, officialPreview, event, savedGoal, comments] = await Promise.all([
-    builtIn ? builtInGpx(builtIn).then((gpx) => ({ ...builtIn, gpx })) : stored!,
+    builtIn ? builtInGpx(builtIn).then((gpx) => ({ ...builtIn, gpx })) : { ...stored!, gpx: stored!.gpx! },
     linkPreview((builtIn ?? stored!).officialUrl),
     eventOf(id, user),
     savedGoalFor(id, user?.email),
@@ -104,5 +108,39 @@ export default async function RacePage(props: PageProps<"/races/[id]">) {
     >
       <RaceComments raceId={id} comments={comments} me={user ? { id: personId(user.email), ...(user.admin ? { name: RUNNING_DOC, avatar: RUNNING_DOC_AVATAR } : { name: user.name }) } : null} />
     </Planner>
+  );
+}
+
+/** A race listed before its course GPX is out: the details and links, no planner yet. */
+function UpcomingRace({ race }: { race: NonNullable<Awaited<ReturnType<typeof storedRaceForPlanner>>> }) {
+  return (
+    <main className={styles.page}>
+      <SiteHeader />
+      <section className={styles.intro}>
+        <p className={styles.date}>{race.dateLabel}</p>
+        <h1 className={styles.title}>{race.event}</h1>
+        <p className={styles.lede}>
+          {race.category}, {race.location}
+          {race.startTime ? `, starts ${race.startTime}` : ""}
+        </p>
+        <p className={styles.lede}>Course GPX coming soon. Check back closer to race day.</p>
+        <ul className={styles.links}>
+          <li>
+            <a href={race.officialUrl} target="_blank" rel="noreferrer" className={styles.link}>
+              <ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />
+              Official website
+            </a>
+          </li>
+          {race.files.map((f) => (
+            <li key={f.href}>
+              <a href={f.href} download className={styles.link}>
+                <FileDown size={16} strokeWidth={1.75} aria-hidden="true" />
+                {f.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </main>
   );
 }

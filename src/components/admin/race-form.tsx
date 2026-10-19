@@ -189,7 +189,7 @@ export function RaceForm({ race, events = [] }: { race: StoredRace | null; /** E
             note={`Up to ${formatMb(LIMITS.gpx)}`}
             onFilesChange={pickGpx}
           />
-          {race && !gpx ? (
+          {race?.gpxUrl && !gpx ? (
             <a className={styles.current} href={race.gpxUrl} download>
               <Route size={16} strokeWidth={1.75} aria-hidden="true" />
               Current GPX
