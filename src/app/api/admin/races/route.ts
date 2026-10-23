@@ -3,7 +3,7 @@ import { sameRace } from "@/lib/courses/distance";
 import { logEvent } from "@/lib/server/activity";
 import { apiAuthError } from "@/lib/server/auth";
 import { API_ACTOR, apiFailure, parseRaceInput, slugify, uniqueId, writeRace } from "@/lib/server/race-input";
-import { overviewRaces, type RaceCard } from "@/lib/server/races";
+import { getStoredRace, overviewRaces, type RaceCard } from "@/lib/server/races";
 
 /**
  * Races API for bots, with a bearer token (RACES_API_TOKEN). Races added here are
@@ -49,7 +49,10 @@ export async function POST(req: Request) {
   try {
     // Same check as publishing a runner's race: same event name, day and distance.
     const same = (await overviewRaces(null)).find((r) => sameRace(r, { event: input.event, date: input.date, km: input.officialKm }));
-    if (same) return Response.json({ error: "Race already exists", existing: summary(same) }, { status: 409 });
+    if (same) {
+      const updatedAt = same.builtIn ? null : ((await getStoredRace(same.id))?.updatedAt ?? null);
+      return Response.json({ error: "Race already exists", existing: { ...summary(same), updatedAt } }, { status: 409 });
+    }
     // The slug is taken by another edition of the race: give this one its year.
     const slug = slugify(`${input.event} ${input.category}`);
     let id = await uniqueId(slug);

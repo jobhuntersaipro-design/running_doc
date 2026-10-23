@@ -72,7 +72,9 @@ describe("races API", () => {
     const before = await files();
     const dup = await POST(req("POST", undefined, fields));
     expect(dup.status).toBe(409);
-    expect((await dup.json()).existing.id).toBe(race.id);
+    const body = await dup.json();
+    expect(body.existing.id).toBe(race.id);
+    expect(body.existing.updatedAt).toBe(race.updatedAt);
     expect(await files()).toEqual(before);
 
     const patched = await PATCH(req("PATCH", undefined, { startTime: "05:30" }, { gpx: gpxFile() }), ctx(race.id));
