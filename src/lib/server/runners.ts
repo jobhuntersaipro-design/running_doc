@@ -6,11 +6,11 @@ import { isRunnerProfile, isSavedGoal, type RunnerProfile, type SavedGoal } from
 const url = process.env.DATABASE_URL?.trim();
 const sql = url ? neon(url) : null;
 
-// ponytail: the one table is created and extended on first use; add a migration tool once there is a second table.
+// ponytail: tables are created and extended on first use; add a migration tool once a change needs more than "if not exists".
 let ready: Promise<unknown> | null = null;
 
-/** The database, with the runners table in place. A failed setup is retried on the next call. */
-function db() {
+/** The database, with its tables in place. A failed setup is retried on the next call. */
+export function db() {
   if (!sql) return null;
   ready ??= sql`create table if not exists runners (
     email text primary key,
@@ -20,6 +20,38 @@ function db() {
   )`
     .then(() => sql`alter table runners add column if not exists profile jsonb`)
     .then(() => sql`alter table runners add column if not exists goals jsonb not null default '{}'::jsonb`)
+    .then(() => sql`create table if not exists comments (
+      id bigserial primary key,
+      race_id text not null,
+      email text not null,
+      name text not null,
+      body text not null,
+      created_at timestamptz not null default now()
+    )`)
+    .then(() => sql`create index if not exists comments_race on comments (race_id, created_at)`)
+    .then(() => sql`alter table comments add column if not exists parent_id bigint, add column if not exists edited boolean not null default false, add column if not exists deleted boolean not null default false`)
+    .then(() => sql`create table if not exists comment_reactions (
+      comment_id bigint not null references comments (id) on delete cascade,
+      email text not null,
+      emoji text not null,
+      primary key (comment_id, email, emoji)
+    )`)
+    .then(() => sql`create table if not exists events (
+      id bigserial primary key,
+      at timestamptz not null default now(),
+      email text not null,
+      kind text not null,
+      race_id text,
+      detail text not null default ''
+    )`)
+    .then(() => sql`create index if not exists events_at on events (at desc)`)
+    .then(() => sql`create table if not exists race_likes (
+      event_key text not null,
+      email text not null,
+      created_at timestamptz not null default now(),
+      primary key (event_key, email)
+    )`)
+    .then(() => sql`alter table runners add column if not exists race_emails boolean not null default true`)
     .catch((e) => {
       ready = null;
       throw e;
@@ -37,14 +69,28 @@ export async function recordSignIn(email: string, name: string): Promise<void> {
     on conflict (email) do update set name = excluded.name, last_sign_in_at = now()`;
 }
 
-export type Runner = { email: string; name: string; signedUpAt: string };
+export type Runner = {
+  email: string;
+  name: string;
+  signedUpAt: string;
+  lastSignInAt: string;
+  profile: RunnerProfile | null;
+  goals: Record<string, SavedGoal>;
+};
 
 /** Every runner who has signed up, newest first, or null without a database. */
 export async function listRunners(): Promise<Runner[] | null> {
   const q = await db();
   if (!q) return null;
-  const rows = await q`select email, name, signed_up_at from runners order by signed_up_at desc`;
-  return rows.map((r) => ({ email: r.email, name: r.name, signedUpAt: new Date(r.signed_up_at).toISOString() }));
+  const rows = await q`select email, name, signed_up_at, last_sign_in_at, profile, goals from runners order by signed_up_at desc`;
+  return rows.map((r) => ({
+    email: r.email,
+    name: r.name,
+    signedUpAt: new Date(r.signed_up_at).toISOString(),
+    lastSignInAt: new Date(r.last_sign_in_at).toISOString(),
+    profile: isRunnerProfile(r.profile) ? r.profile : null,
+    goals: Object.fromEntries(Object.entries((r.goals ?? {}) as Record<string, unknown>).filter((e): e is [string, SavedGoal] => isSavedGoal(e[1]))),
+  }));
 }
 
 /** A runner's saved profile, or null without a database or before they save one. */
@@ -79,4 +125,36 @@ export async function saveGoal(email: string, name: string, raceId: string, goal
   await q`insert into runners (email, name, goals) values (${key(email)}, ${name}, jsonb_build_object(${raceId}::text, ${JSON.stringify(goal)}::jsonb))
     on conflict (email) do update set goals = runners.goals || excluded.goals`;
   return true;
+}
+
+/** Runners who get an email when a race is published, leaving out these emails. Empty without a database. */
+export async function raceEmailRecipients(except: string[]): Promise<{ email: string; name: string }[]> {
+  const q = await db();
+  if (!q) return [];
+  const rows = await q`select email, name from runners where race_emails and not (email = any(${except.map(key)}::text[]))`;
+  return rows.map((r) => ({ email: r.email, name: r.name }));
+}
+
+/** Whether the runner gets new-race emails. Null without a database or for an unknown runner. */
+export async function getRaceEmails(email: string): Promise<boolean | null> {
+  const q = await db();
+  if (!q) return null;
+  const [row] = await q`select race_emails from runners where email = ${key(email)}`;
+  return row ? row.race_emails : null;
+}
+
+/** Turns new-race emails on or off. Resolves false without a database or for an unknown runner. */
+export async function setRaceEmails(email: string, on: boolean): Promise<boolean> {
+  const q = await db();
+  if (!q) return false;
+  const rows = await q`update runners set race_emails = ${on} where email = ${key(email)} returning email`;
+  return rows.length > 0;
+}
+
+/** Removes what runners left on a deleted race: its comments (their reactions go with them) and goals saved for it. */
+export async function forgetRace(raceId: string): Promise<void> {
+  const q = await db();
+  if (!q) return;
+  await q`delete from comments where race_id = ${raceId}`;
+  await q`update runners set goals = goals - ${raceId}::text where goals ? ${raceId}::text`;
 }

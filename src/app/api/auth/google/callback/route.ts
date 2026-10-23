@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { safeNext, startSession } from "@/lib/server/auth";
+import { logEvent } from "@/lib/server/activity";
 import { recordSignIn } from "@/lib/server/runners";
 import { welcomeOnce } from "@/lib/server/welcome";
 
@@ -62,5 +63,6 @@ export async function GET(req: Request) {
   // After the redirect is sent, so sign-in never waits on the email or the database.
   after(() => welcomeOnce(claims.email!, claims.name ?? "", url.origin).catch((e) => console.error("Welcome email failed:", e)));
   after(() => recordSignIn(claims.email!, claims.name ?? "").catch((e) => console.error("Recording sign-in failed:", e)));
+  after(() => logEvent(claims.email!, "signin"));
   return Response.redirect(new URL(safeNext(expected.next ?? null), url.origin), 302);
 }

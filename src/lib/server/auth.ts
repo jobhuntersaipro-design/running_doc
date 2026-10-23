@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 /**
@@ -53,6 +53,9 @@ export interface SessionUser {
 
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
+/** Whether this is the admin's email. The admin speaks as Running Doc. */
+export const isAdminEmail = (email: string) => adminConfigured() && sameEmail(email, process.env.ADMIN_EMAIL ?? "");
+
 /** Signs the user in for SESSION_DAYS. The admin is whoever has ADMIN_EMAIL, by password or Google. */
 export async function startSession(user: { email: string; name: string }): Promise<void> {
   const payload = Buffer.from(
@@ -95,4 +98,20 @@ export async function isAdmin(): Promise<boolean> {
 /** A same-site path to return to after sign-in; anything else goes home. */
 export function safeNext(next: string | null): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+}
+
+const sha256 = (s: string) => createHash("sha256").update(s).digest();
+
+/**
+ * Checks the bearer token of a races API call against RACES_API_TOKEN. Returns the
+ * error response to send, or null when the token matches. The API stays off (503)
+ * until a token of at least 32 characters is set. Never logs or echoes the token.
+ */
+export function apiAuthError(req: Request): Response | null {
+  const token = (process.env.RACES_API_TOKEN ?? "").trim();
+  if (token.length < 32) return Response.json({ error: "API disabled" }, { status: 503 });
+  const sent = /^Bearer (.+)$/.exec(req.headers.get("authorization") ?? "")?.[1]?.trim() ?? "";
+  // Hashing both sides first gives equal lengths, so the comparison does not leak the token length.
+  if (!timingSafeEqual(sha256(sent), sha256(token))) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  return null;
 }

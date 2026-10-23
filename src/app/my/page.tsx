@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "My races", robots: { index: false, f
 export default async function MyRacesPage(props: PageProps<"/my">) {
   const user = await getUser();
   if (!user) redirect("/signin?next=/my");
-  const { saved: raceSaved } = await props.searchParams;
+  const { saved: raceSaved, published } = await props.searchParams;
   const [all, storage, goals, cards] = await Promise.all([
     listRaces().catch(() => []),
     checkStorage(),
@@ -29,16 +29,17 @@ export default async function MyRacesPage(props: PageProps<"/my">) {
     .sort((a, b) => b.goal.savedAt.localeCompare(a.goal.savedAt));
   const races = all
     .filter((r) => r.owner?.toLowerCase() === user.email.toLowerCase())
-    .map((r) => ({ ...r, builtIn: false }));
+    .map((r) => ({ ...r, km: r.officialKm, builtIn: false }));
   return (
     <AdminShell signedIn home="/my">
       <RaceDashboard
         title="My races"
-        lede={`Signed in as ${user.email}. Races you add are only visible to you.`}
+        lede={`Signed in as ${user.email}. Races you add are private until you switch them to public.`}
         base="/my"
         races={races}
         saved={Boolean(raceSaved)}
         storage={storage}
+        published={typeof published === "string" ? published : undefined}
         empty="No races added yet. Add your race with its course GPX, route map and documents to get a full plan."
       >
         <SavedGoals goals={saved} />

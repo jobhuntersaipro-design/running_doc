@@ -1,10 +1,7 @@
 import "server-only";
 import { SUGGESTION_EMAIL } from "../../app/suggestion/shared";
-import { emailReady, sendEmail } from "./email";
+import { emailReady, esc, FONT, sendEmail } from "./email";
 import { listFiles, saveFile, storageReady, userKey } from "./store";
-
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
 
 const STEPS = [
   ["Add your race", "Upload the course GPX from the organiser, Strava or Garmin Connect, plus the route map if you have it. Only you can see your races."],
