@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink, FileDown, Plus } from "lucide-react";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
 import { RoutePreview } from "@/components/site/route-preview";
+import { LikeButton } from "@/components/site/like-button";
 import { SiteHeader } from "@/components/site/site-header";
+import { VisibilityBadge } from "@/components/site/visibility-badge";
 import { shortDistance } from "@/lib/courses/distance";
-import type { RaceEvent } from "@/lib/server/races";
+import type { Likes } from "@/lib/server/likes";
+import { RUNNING_DOC, RUNNING_DOC_AVATAR, type RaceEvent } from "@/lib/server/races";
 import styles from "./overview.module.css";
 
 function startLabel(hhmm?: string) {
@@ -13,7 +18,21 @@ function startLabel(hhmm?: string) {
 }
 
 /** The home page: one card per event, with a ribbon for each distance. Opening a card shows its race plan. */
-export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: boolean }) {
+export function Overview({
+  events,
+  likes,
+  viewerEmail,
+  isAdmin = false,
+}: {
+  events: RaceEvent[];
+  /** By event key. */
+  likes: Record<string, Likes>;
+  /** The signed-in runner, if any. */
+  viewerEmail?: string;
+  /** The admin sees a visibility badge on every card, not only on private and published ones. */
+  isAdmin?: boolean;
+}) {
+  const signedIn = Boolean(viewerEmail);
   return (
     <main className={styles.page}>
       <SiteHeader />
@@ -40,25 +59,47 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                     {/* Covers come from R2 or /api/files, so a plain img avoids image optimizer host config. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={r.coverUrl} alt="" className={styles.cover} loading="lazy" decoding="async" />
-                    <span className={styles.routeInset} aria-hidden="true">
-                      <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
-                    </span>
+                    {r.preview ? (
+                      <span className={styles.routeInset} aria-hidden="true">
+                        <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
+                      </span>
+                    ) : null}
                   </div>
-                ) : (
+                ) : r.preview ? (
                   <div className={styles.preview}>
                     <RoutePreview {...r.preview} width={320} height={180} className={styles.previewSvg} />
                   </div>
+                ) : (
+                  <div className={`${styles.preview} ${styles.previewSvg}`} />
                 )}
                 <div className={styles.cardBody}>
-                  <p className={styles.date}>
-                    {e.dateLabel}
-                    {e.private ? ", only you can see this" : ""}
-                  </p>
+                  {r.preview ? null : (
+                    <p>
+                      <Badge tone="info" size="sm">
+                        GPX coming soon
+                      </Badge>
+                    </p>
+                  )}
+                  {e.private || e.publishedBy || isAdmin ? (
+                    <p className={styles.privacy}>
+                      <VisibilityBadge visibility={e.private ? "private" : e.publishedBy ? "published" : "public"} />
+                      {!e.private
+                        ? "Everyone can see this"
+                        : r.owner?.toLowerCase() === viewerEmail?.toLowerCase()
+                          ? "Only you can see this"
+                          : `Only ${e.createdBy} and admins can see this`}
+                    </p>
+                  ) : null}
+                  <p className={styles.date}>{e.dateLabel}</p>
                   <h2 className={styles.cardTitle}>{e.event}</h2>
                   <p className={styles.meta}>
                     {single ? `${r.category}, ` : ""}
                     {e.location}
                     {single && startLabel(r.startTime) ? `, ${startLabel(r.startTime)}` : ""}
+                  </p>
+                  <p className={styles.byline}>
+                    <Avatar name={e.createdBy} src={e.createdBy === RUNNING_DOC ? RUNNING_DOC_AVATAR : undefined} size="sm" />
+                    {e.publishedBy ? "Published" : "Created"} by {e.createdBy}
                   </p>
                   <span className={styles.open}>
                     Open race plan
@@ -92,6 +133,9 @@ export function Overview({ events, signedIn }: { events: RaceEvent[]; signedIn: 
                       </li>
                     ))
                   : null}
+                <li className={styles.likeItem}>
+                  <LikeButton raceId={r.id} event={e.event} likes={likes[e.key] ?? { count: 0, mine: false }} signedIn={signedIn} />
+                </li>
               </ul>
             </li>
           );

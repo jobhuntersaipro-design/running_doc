@@ -112,6 +112,16 @@
   font-size: var(--text-sm);
 }
 
+.privacy,
+.byline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .cardTitle {
   font-size: var(--text-lg);
   font-weight: 500;
@@ -141,6 +151,11 @@
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-2);
   border-top: 1px solid var(--border-subtle);
+}
+
+.likeItem {
+  margin-inline-start: auto;
+  align-self: center;
 }
 
 .link {

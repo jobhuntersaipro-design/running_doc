@@ -70,3 +70,20 @@ textarea.textarea {
   padding-block: var(--space-2);
   resize: vertical;
 }
+
+/* Like a race event */
+
+.like {
+  display: inline-grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+.liked {
+  color: var(--accent);
+}
+
+.likeError {
+  color: var(--danger);
+  font-size: var(--text-xs);
+}
